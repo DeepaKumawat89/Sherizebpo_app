@@ -1,0 +1,117 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ─── Helpers ───────────────────────────────────────────────
+    // Role is delivered via Firebase custom auth claims (same as Firestore rules).
+    function hasStorageRole(allowed) {
+      return request.auth != null
+        && (
+          (('role' in request.auth.token) && request.auth.token.role in allowed)
+          || (('roles' in request.auth.token) && request.auth.token.roles.hasAny(allowed))
+        );
+    }
+
+    function isAdminStorage() {
+      return hasStorageRole(['admin', 'super_admin', 'kyc_admin', 'task_review_admin', 'payment_admin', 'developer']);
+    }
+
+    // Support desk: may read attachments on the tickets they triage.
+    function isSupportStorage() {
+      return hasStorageRole(['admin', 'super_admin', 'support_admin']);
+    }
+
+    function isKycReviewerStorage() {
+      return hasStorageRole(['admin', 'super_admin', 'kyc_admin']);
+    }
+
+    // Cross-service read: the campaign doc's clientId must match the caller.
+    function isCampaignOwnerStorage(campaignId) {
+      return request.auth != null
+        && firestore.get(/databases/(default)/documents/campaigns/$(campaignId)).data.clientId == request.auth.uid;
+    }
+
+    match /client-kyc/{clientId}/{submissionId}/{fileName} {
+      allow read: if request.auth != null && (request.auth.uid == clientId || isKycReviewerStorage());
+      allow create: if request.auth != null
+        && request.auth.uid == clientId
+        && request.resource.size <= 10 * 1024 * 1024
+        && request.resource.contentType.matches('(application/pdf|image/jpeg|image/png)')
+        && request.resource.metadata.ownerId == request.auth.uid
+        && (
+          (request.resource.metadata.documentType == 'identity' && fileName.matches('identity-.*'))
+          || (request.resource.metadata.documentType == 'address' && fileName.matches('address-.*'))
+          || (request.resource.metadata.documentType == 'company' && fileName.matches('company-.*'))
+        );
+      allow update: if false;
+      allow delete: if request.auth != null && (request.auth.uid == clientId || isKycReviewerStorage());
+    }
+
+    match /client-avatars/{clientId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.auth.uid == clientId
+        && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Core KYC Logic: Deny access globally unless strictly scoped inside user's directory constraints
+    match /kyc/{userId}/{fileName} {
+      
+      // Strict Reading: Users can ONLY read their own uploaded files (aadhaar/pan). 
+      // Admins can read globally. Profile images are readable by all authenticated users.
+      allow read: if request.auth != null && (
+        request.auth.uid == userId || 
+        isKycReviewerStorage() ||
+        fileName == 'profile.jpg'
+      );
+      
+      // Strict Writing: Enforce limits on size and file type preventing rogue bucket filling payloads
+      // Allow only mapping 3 documents: profile.jpg, aadhaar.jpg, pan.jpg
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && fileName.matches('(profile|aadhar|aadhaar|pan)\\.(jpg|png|jpeg)')
+                   && request.resource.size < 5 * 1024 * 1024 // 5MB Limit per image
+                   && (request.resource.contentType == 'image/jpeg' || request.resource.contentType == 'image/png');
+    }
+
+    // Core Profile Logic: Expose 'profile' routes dynamically
+    match /profile/{userId}/{fileName} {
+      // Secure Reading: Anyone authenticated can view profile images globally
+      allow read: if request.auth != null;
+      
+      // Strict Writing: Allow 5MB payloads restricted exclusively to user uid directories matching strictly 'profile.jpg'
+      allow write: if request.auth != null 
+                   && request.auth.uid == userId
+                   && fileName.matches('profile\\.(jpg|png|jpeg)')
+                   && request.resource.size < 5 * 1024 * 1024 
+                   && (request.resource.contentType == 'image/jpeg' || request.resource.contentType == 'image/png');
+    }
+    
+    // Clients import through createCampaignLeads. Only trusted admins may use
+    // the legacy Storage-triggered sheet ingestion path.
+    match /lead_sheets/{campaignId}/{fileName} {
+      allow read: if isCampaignOwnerStorage(campaignId) || isAdminStorage();
+      allow write: if isAdminStorage()
+                   && request.resource.size < 50 * 1024 * 1024 // 50MB limit for large files
+                   && fileName.matches('.*\\.(csv|xlsx|CSV|XLSX)');
+    }
+    
+    // Support Screenshots: a worker/client attaches a screenshot to a support
+    // request. Written to support_screenshots/{uid}/{file}. The owner uploads
+    // their own; the support desk (and admins) read them to triage the ticket.
+    match /support_screenshots/{userId}/{fileName} {
+      allow read: if request.auth != null
+                  && (request.auth.uid == userId || isSupportStorage());
+      allow write: if request.auth != null
+                   && request.auth.uid == userId
+                   && request.resource.size < 10 * 1024 * 1024 // 10MB
+                   && request.resource.contentType.matches('image/.*');
+    }
+
+    // Fail closed default
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

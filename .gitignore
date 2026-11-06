@@ -1,0 +1,96 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/ephemeral/
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+.firebase/
+**/node_modules/
+*.tsbuildinfo
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+# Android release signing material
+/android/key.properties
+/android/app/*.jks
+/android/app/*.keystore
+
+# Secret / Credentials — NEVER commit these
+**/functions/.env
+**/functions/.env.*
+!**/functions/.env.example
+/.env
+/.env.*
+!/.env.example
+
+# Local credentials, service accounts, certificates, and signing material
+**/key.properties
+**/serviceAccountKey.json
+**/*service-account*.json
+**/*firebase-adminsdk*.json
+**/*credentials*.json
+**/*.jks
+**/*.keystore
+**/*.p12
+**/*.pfx
+**/*.pem
+**/*.key
+**/*.mobileprovision
+**/*.cer
+
+# Local secret/config files
+**/*secret*.json
+**/*secrets*.json
+**/local.properties
+
+# Debug/log files — internal only
+**/functions/CF_LOGS*.txt
+**/functions/logs.txt
+**/functions/debug_*.js
+**/functions/scan_*.js
+**/functions/*_report*.json
+**/functions/*_results*.txt
+**/functions/jest-results.txt
+**/functions/lint-results.json
+hs_err_pid*.log
+replay_pid*.log

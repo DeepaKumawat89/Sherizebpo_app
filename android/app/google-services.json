@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "1008144551131",
+    "project_id": "sherize-bpo",
+    "storage_bucket": "sherize-bpo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1008144551131:android:d12ace1802384dca5e90fe",
+        "android_client_info": {
+          "package_name": "com.example.human_bpo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCA7i57stlugMJ1Uqp8zaWAsIRyROZIXiA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1008144551131:android:5ade2d212b245f915e90fe",
+        "android_client_info": {
+          "package_name": "in.sherize.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCA7i57stlugMJ1Uqp8zaWAsIRyROZIXiA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

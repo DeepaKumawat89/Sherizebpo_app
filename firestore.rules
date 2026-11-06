@@ -1,0 +1,701 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ──────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getRole() {
+      // Use Firebase Custom Auth Claims to avoid database read penalty (Fix for H4)
+      return ('role' in request.auth.token) ? request.auth.token.role : null;
+    }
+
+    // Multi-role support: an admin may hold several roles. Claims carry both the
+    // primary `role` (string) and the full `roles` (list). hasAnyRole checks the
+    // union of the two against the allowed set.
+    function getRoles() {
+      return ('roles' in request.auth.token) ? request.auth.token.roles : [];
+    }
+
+    function hasAnyRole(allowed) {
+      let role = getRole();
+      return isAuthenticated() &&
+        ((role != null && role in allowed) || getRoles().hasAny(allowed));
+    }
+
+    function isAdmin() {
+      return hasAnyRole(['admin', 'super_admin', 'task_review_admin', 'kyc_admin', 'payment_admin', 'developer']);
+    }
+
+    // Developer is the highest privilege (attribution owner). Anchored in the
+    // app to a specific email; here it is recognised via the synced role claim.
+    function isDeveloper() {
+      return hasAnyRole(['developer']);
+    }
+
+    function isSuperAdmin() {
+      return hasAnyRole(['admin', 'super_admin', 'developer']);
+    }
+
+    function isTeamLeader() {
+      return isAuthenticated()
+        && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'team_leader'
+          || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('roles', []).hasAny(['team_leader']))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('isActive', true) == true;
+    }
+
+    function isTaskAdmin() {
+      return hasAnyRole(['admin', 'super_admin', 'task_review_admin']);
+    }
+
+    function isKycAdmin() {
+      return hasAnyRole(['admin', 'super_admin', 'kyc_admin']);
+    }
+
+    // Payout team: approves/rejects withdrawals and releases money (Model A
+    // stage-2 payment). super_admin/admin can do everything a payment admin can.
+    function isPaymentAdmin() {
+      return hasAnyRole(['admin', 'super_admin', 'payment_admin']);
+    }
+
+    // Support desk team: resolves worker + client tickets and handles live chats.
+    function isSupportAdmin() {
+      return hasAnyRole(['admin', 'super_admin', 'support_admin']);
+    }
+
+    // A worker may only accept/start tasks once their KYC is approved.
+    // rules get() runs with elevated privileges, so it can read the user doc
+    // even though normal reads are locked down to owner + super admin.
+    function isKycApproved() {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('kycStatus', 'pending') in ['approved', 'verified'];
+    }
+
+    function isCampaignOwner(campaignId) {
+      return isAuthenticated() &&
+        get(/databases/$(database)/documents/campaigns/$(campaignId)).data.clientId == request.auth.uid;
+    }
+
+    function isActiveClient() {
+      return isAuthenticated()
+        && get(/databases/$(database)/documents/clients/$(request.auth.uid)).data.get('kycStatus', '') == 'approved'
+        && get(/databases/$(database)/documents/clients/$(request.auth.uid)).data.get('accountActive', false) == true;
+    }
+
+    // ─── App Config (developer-controlled branding / credit) ───
+    // Publicly readable so the credit always renders; only the developer
+    // may change it (toggle visibility, edit text, lock).
+    match /app_config/{docId} {
+      allow read: if true;
+      allow write: if docId != 'android_update' && isDeveloper();
+      allow create, update: if docId == 'android_update'
+        && hasAnyRole(['super_admin', 'developer'])
+        && request.resource.data.keys().hasAll(['enabled', 'latestBuild', 'minimumBuild', 'message'])
+        && request.resource.data.keys().hasOnly(['enabled', 'latestBuild', 'minimumBuild', 'message'])
+        && request.resource.data.enabled is bool
+        && request.resource.data.latestBuild is int
+        && request.resource.data.minimumBuild is int
+        && request.resource.data.minimumBuild >= 0
+        && request.resource.data.latestBuild >= request.resource.data.minimumBuild
+        && request.resource.data.latestBuild <= 2100000000
+        && (!request.resource.data.enabled || request.resource.data.latestBuild > 0)
+        && request.resource.data.message is string
+        && request.resource.data.message.size() <= 300;
+      allow delete: if docId == 'android_update' && hasAnyRole(['super_admin', 'developer']);
+    }
+
+    // ─── Job Postings (hiring / recruitment) ───────────────────
+    // Openings are public job ads: anyone (including the no-login careers web
+    // page) can read them. Only super admins post/close them.
+    match /job_postings/{jobId} {
+      allow read: if true;
+      allow create, update, delete: if isSuperAdmin();
+    }
+
+    // ─── Job Applications ──────────────────────────────────────
+    // Applicants create + read their OWN application; super admins read all and
+    // move them through interview → hire / reject.
+    match /job_applications/{appId} {
+      allow read: if isSuperAdmin()
+        || (isAuthenticated() && resource.data.applicantUid == request.auth.uid);
+      allow create: if isAuthenticated()
+        && request.resource.data.applicantUid == request.auth.uid;
+      allow update, delete: if isSuperAdmin();
+    }
+
+    // ─── Notifications Collection ──────────────────────────────
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      allow update: if request.auth != null && request.auth.uid == resource.data.userId
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read'])
+                    && request.resource.data.read == true;
+      allow create, delete: if false; // Only Cloud Functions can create or delete
+    }
+
+    // ─── Users Collection ──────────────────────────────────────
+    match /users/{userId} {
+      // PRIVACY: A worker's full profile (name, email, phone, DOB, address,
+      // KYC data, bank info, etc.) is private. It may be read ONLY by:
+      //   - the owner themselves, or
+      //   - an admin. Delegated admin roles legitimately NEED worker profiles to
+      //     do their job: kyc_admin reviews identity docs, task_review_admin
+      //     reviews submissions, payment_admin needs bank details for payouts.
+      //     Restricting to super admin broke those queues, so any admin role may
+      //     read profiles. Peers (non-admin workers) still never see another
+      //     worker's data — only the document ID is referenced elsewhere.
+      allow read: if isOwner(userId) || isAdmin()
+        || (isTeamLeader() && resource.data.teamLeaderId == request.auth.uid);
+
+      // Users can create their own document on first login
+      // Super admins can create documents for any user (e.g. creating admin accounts)
+      allow create: if (isOwner(userId)
+        && (!('role' in request.resource.data) || request.resource.data.role == 'worker')
+        && (!('roles' in request.resource.data) || request.resource.data.roles.hasOnly(['worker'])))
+        || isSuperAdmin();
+
+      // Users can update their own doc BUT cannot modify protected fields.
+      // Protected: money fields (earnings, walletBalance, totalEarnings,
+      // lockedBalance), progress counters, and identity/verification flags.
+      //   - Money fields are written ONLY by Cloud Functions (Admin SDK).
+      //   - emailVerified is written ONLY by Cloud Functions (Admin SDK).
+      //   - phoneVerified may be written by client after OTP success (proof-of-possession
+      //     is the PhoneAuthCredential already validated by Firebase Auth).
+      allow update: if isOwner(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['earnings', 'walletBalance', 'totalEarnings', 'completedTasks', 'completed_tasks', 'lockedBalance',
+                   'emailVerified', 'emailVerifiedAt', 'role', 'roles', 'uid', 'teamLeaderId', 'workerId',
+                   'employeeId', 'isActive', 'onboardingStatus', 'kycStatus', 'kyc_status']);
+
+      // Workers may submit KYC evidence and move only to pending review.
+      allow update: if isOwner(userId)
+        && request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['profileImageUrl', 'aadhaarUrl', 'panUrl', 'kycStatus', 'submittedAt'])
+        && request.resource.data.kycStatus == 'pending';
+
+      // Admins manage users (KYC, role, status, rating) but NOT money fields.
+      // All wallet/earnings mutations go through Cloud Functions (Admin SDK),
+      // so no client — not even an admin — may write them directly.
+      allow update: if isAdmin() && !isSuperAdmin()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['earnings', 'walletBalance', 'totalEarnings', 'lockedBalance', 'uid', 'role', 'roles']);
+
+      // Only platform admins may change role assignments.
+      allow update: if isSuperAdmin()
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['earnings', 'walletBalance', 'totalEarnings', 'lockedBalance', 'uid']);
+
+      // Account deletion: owner or admin
+      allow delete: if isOwner(userId) || isAdmin();
+    }
+
+    // ─── Clients Collection ──────────────────────────────────────
+    match /clients/{clientId} {
+      // Clients can read their own profile; admins can read all
+      allow read: if isOwner(clientId) || isAdmin();
+
+      // Account creation is limited to the exact onboarding payload used by
+      // the client portal. Approval, KYC, access, wallet, payment and billing
+      // fields can only be added later by trusted server/admin flows.
+      allow create: if isOwner(clientId)
+        && request.resource.data.keys().hasAll([
+          'clientId', 'email', 'accountType', 'status', 'createdAt'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'clientId', 'email', 'accountType', 'status', 'createdAt'
+        ])
+        && request.resource.data.clientId == request.auth.uid
+        && request.resource.data.email is string
+        && request.resource.data.email == request.auth.token.email
+        && request.resource.data.accountType in ['company', 'individual']
+        && request.resource.data.status == 'onboarding'
+        && request.resource.data.createdAt == request.time;
+
+      // Clients may edit presentation-only profile fields. KYC transitions
+      // (including pending_review), approval decisions and account activation
+      // remain server-controlled through submitClientKyc/admin workflows.
+      allow update: if isOwner(clientId)
+        && request.resource.data.keys().hasAll(resource.data.keys())
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'firstName',
+          'lastName',
+          'gender',
+          'companyName',
+          'photoURL',
+          'dashboardNotes',
+          'updatedAt'
+        ])
+        && (!('firstName' in request.resource.data)
+          || (request.resource.data.firstName is string
+            && request.resource.data.firstName.size() > 0
+            && request.resource.data.firstName.size() <= 100))
+        && (!('lastName' in request.resource.data)
+          || (request.resource.data.lastName is string
+            && request.resource.data.lastName.size() > 0
+            && request.resource.data.lastName.size() <= 100))
+        && (!('gender' in request.resource.data)
+          || (request.resource.data.gender is string
+            && request.resource.data.gender.size() > 0
+            && request.resource.data.gender.size() <= 40))
+        && (!('companyName' in request.resource.data)
+          || (request.resource.data.companyName is string
+            && request.resource.data.companyName.size() <= 200))
+        && (!('photoURL' in request.resource.data)
+          || (request.resource.data.photoURL is string
+            && request.resource.data.photoURL.size() <= 2048
+            && (request.resource.data.photoURL == ''
+              || request.resource.data.photoURL.matches('https://.*'))))
+        && (!('dashboardNotes' in request.resource.data)
+          || (request.resource.data.dashboardNotes is string
+            && request.resource.data.dashboardNotes.size() <= 5000))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['updatedAt'])
+          || request.resource.data.updatedAt == request.time);
+           
+      // Admins (super-admins) can update anything
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    match /admin_audit_logs/{logId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
+    // ─── Tasks Collection (read-only for workers) ──────────────
+    match /tasks/{taskId} {
+      allow read: if isAuthenticated();
+      // Marketplace acceptance is handled atomically by acceptMarketplaceTask.
+      allow update: if isTaskAdmin();
+      allow create, delete: if isSuperAdmin();
+
+      // Leads subcollection
+      match /leads/{leadId} {
+        allow read: if isAuthenticated();
+        
+        // Only assigned workers can update lead items they are working on
+        allow create, update: if isAuthenticated() && 
+          exists(/databases/$(database)/documents/task_assignments/$(request.auth.uid + "_" + taskId));
+
+        allow delete: if isAdmin();
+      }
+    }
+
+    // ─── FAQ Management ────────────────────────────────────────
+    match /faqs/{faqId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // ─── Task Assignments ──────────────────────────────────────
+    match /task_assignments/{assignmentId} {
+      // Workers can only read their OWN assignments
+      allow read: if isAuthenticated() && 
+        (resource == null || resource.data.userId == request.auth.uid || isAdmin()
+          || isTeamLeader());
+
+      allow create: if false;
+
+      allow update: if isTaskAdmin();
+
+      // Cleanup: admin only
+      allow delete: if isTaskAdmin();
+    }
+
+    // ─── Task Submissions ──────────────────────────────────────
+    // Workers can CREATE submissions, but status changes (approve/reject)
+    // are handled ONLY through Cloud Functions (Admin SDK bypasses rules)
+    match /task_submissions/{submissionId} {
+      // Admins can read ALL submissions (collection-level queries)
+      allow read: if isTaskAdmin();
+      // Workers can read only their own submissions
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      // Submissions are created ONLY by the submitTaskWork callable, which
+      // re-checks campaign pause state, funds, lead ownership, and sets the
+      // authoritative payout. Direct client writes are not allowed.
+      allow create: if false;
+
+      // Workers CANNOT update status — only Cloud Functions can
+      // Admins can update via client for non-critical fields
+      allow update: if isTaskAdmin();
+      allow delete: if isTaskAdmin();
+    }
+
+    // ─── Earnings Pending ──────────────────────────────────────
+    // Status changes (approved/rejected) happen ONLY in Cloud Functions
+    match /earnings_pending/{docId} {
+      allow read: if isKycAdmin();
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+
+      // Status changes (approved/rejected) move money and are written ONLY by
+      // Cloud Functions (Admin SDK bypasses these rules). No client — not even
+      // an admin — may mutate earnings_pending directly.
+      allow update, delete: if false;
+    }
+
+    // ─── Earnings History ──────────────────────────────────────
+    // Created ONLY by Cloud Functions during approval
+    match /earnings_history/{docId} {
+      allow read: if isKycAdmin();
+      allow read: if isAuthenticated() &&
+        resource.data.userId == request.auth.uid;
+
+      // Workers CANNOT create, update or delete
+      // Only Cloud Functions (Admin SDK) and admins
+      allow create, update, delete: if isKycAdmin();
+    }
+
+    // ─── Withdraw Requests ─────────────────────────────────────
+    // Created by Cloud Functions (requestWithdrawal)
+    // Status updates ONLY through Cloud Functions (processWithdrawal)
+    match /withdraw_requests/{docId} {
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+
+      // Workers can create via Cloud Function, but also allow
+      // direct creation as fallback (Cloud Function is preferred)
+      allow create: if isAuthenticated() &&
+        request.resource.data.userId == request.auth.uid;
+
+      // Only admin / Cloud Functions can approve/reject/delete. Both the KYC
+      // desk and the dedicated payout team may process withdrawals.
+      allow update, delete: if isKycAdmin() || isPaymentAdmin();
+    }
+
+    // ─── Payout History ────────────────────────────────────────
+    // Created ONLY by Cloud Functions during withdrawal approval
+    match /payout_history/{docId} {
+      // Workers can read their own payout history
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+
+      // Only Cloud Functions (Admin SDK) can create/modify
+      allow create, update, delete: if isKycAdmin() || isPaymentAdmin();
+    }
+
+    // ─── Calls Collection (VOIP Twilio) ──────────────────────────
+    match /calls/{callId} {
+      // Workers can read their own calls; admins can read all
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+
+      // Workers can create call records for themselves
+      allow create: if isAuthenticated() &&
+        isKycApproved() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.status == 'initiated' &&
+        request.resource.data.get('exotelCallSid', null) == null &&
+        request.resource.data.get('recordingUrl', null) == null &&
+        request.resource.data.get('provider', null) == null;
+
+      // Workers can update their own calls (status updates from app)
+      allow update: if isAuthenticated() &&
+        ((resource.data.userId == request.auth.uid
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['status', 'endedAt'])) || isAdmin());
+
+      // Only admin can delete
+      allow delete: if isAdmin();
+    }
+
+    // ─── FAQ Collection ────────────────────────────────────────
+    match /faqs/{faqId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ─── Support Requests ──────────────────────────────────────
+    match /support_requests/{requestId} {
+      // Support tickets embed the user's name/email/phone. Readable by the
+      // ticket owner and the support desk (support_admin / admin / super_admin).
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isSupportAdmin());
+      // Workers and clients can create their own support requests.
+      allow create: if isAuthenticated()
+        && request.resource.data.get('userId', '') == request.auth.uid
+        && request.resource.data.get('clientId', request.auth.uid) == request.auth.uid
+        && request.resource.data.get('status', '') == 'open'
+        && request.resource.data.get('source', '') in ['', 'client_portal']
+        && request.resource.data.get('subject', '') is string
+        && request.resource.data.get('subject', '').size() > 0
+        && request.resource.data.get('subject', '').size() <= 200
+        && request.resource.data.get('message', '') is string
+        && request.resource.data.get('message', '').size() <= 4000
+        && request.resource.data.keys().hasOnly(['userId', 'clientId', 'name', 'email', 'phone', 'subject', 'message', 'priority', 'issueType', 'status', 'source', 'screenshotUrl', 'createdAt', 'updatedAt']);
+      // The support desk resolves / updates and deletes tickets.
+      allow update: if isSupportAdmin()
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'statusUpdatedAt', 'statusUpdatedBy', 'adminResponse', 'respondedAt', 'respondedBy'])
+        && request.resource.data.get('status', resource.data.get('status', 'open')) in ['open', 'in_progress', 'pending', 'resolved', 'closed'];
+      allow delete: if isSupportAdmin();
+    }
+
+    // ─── Support Chats (client-portal live chat threads) ───────
+    // A thread is keyed by the client's own uid. Readable/writable by the
+    // owner and the support desk. Agent replies come from the support desk.
+    match /support_chats/{chatId} {
+      allow read: if isAuthenticated()
+        && (chatId == request.auth.uid || isSupportAdmin());
+      allow create: if isSupportAdmin() || (isAuthenticated()
+        && chatId == request.auth.uid
+        && request.resource.data.get('clientId', '') == request.auth.uid
+        && request.resource.data.keys().hasOnly(['clientId', 'clientName', 'status', 'lastMessage', 'updatedAt']));
+      allow update: if isSupportAdmin() || (isAuthenticated()
+        && chatId == request.auth.uid
+        && request.resource.data.get('clientId', '') == request.auth.uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clientId', 'clientName', 'status', 'lastMessage', 'updatedAt']));
+      allow delete: if isSupportAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isAuthenticated()
+          && (chatId == request.auth.uid || isSupportAdmin());
+        allow create: if isAuthenticated() && (
+          (chatId == request.auth.uid && request.resource.data.get('sender', '') == 'client')
+          || (isSupportAdmin() && request.resource.data.get('sender', '') == 'admin')
+        );
+        allow update, delete: if isSupportAdmin();
+      }
+    }
+
+    // ─── In-app Mail (threaded inbox) ──────────────────────────
+    // Two thread types share this collection:
+    //  * worker_support — worker ⇄ support desk. A shared queue: any support
+    //    admin can see/answer, so agents are NOT listed in `participants`
+    //    (only the worker is).
+    //  * internal — admin ⇄ admin/team, private to `participants`.
+    match /mail_threads/{threadId} {
+      function isThreadMember() {
+        return isAuthenticated() && (
+          request.auth.uid in resource.data.participants ||
+          (resource.data.type == 'worker_support' && isSupportAdmin())
+        );
+      }
+
+      allow read, update: if isThreadMember();
+      // The creator must list themselves as a participant.
+      allow create: if isAuthenticated()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.participants;
+      allow delete: if isSupportAdmin();
+
+      match /messages/{messageId} {
+        function parentThread() {
+          return get(/databases/$(database)/documents/mail_threads/$(threadId)).data;
+        }
+        function canAccessParent() {
+          return isAuthenticated() && (
+            request.auth.uid in parentThread().participants ||
+            (parentThread().type == 'worker_support' && isSupportAdmin())
+          );
+        }
+        allow read: if canAccessParent();
+        allow create: if canAccessParent()
+          && request.resource.data.senderId == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    // ─── Error Logs (Global Error Boundary) ────────────────────
+    match /error_logs/{logId} {
+      // Any authenticated user can create error logs (auto-logged by app)
+      allow create: if isAuthenticated();
+      // Only admins can read, update (resolve), or delete error logs
+      allow read, update, delete: if isAdmin();
+    }
+
+    // ─── Rate Limits ───────────────────────────────────────────
+    match /rate_limits/{docId} {
+      // Only Cloud Functions (Admin SDK) can read/write to rate limits
+      allow read, write: if false;
+    }
+
+    // ─── Wallet System ─────────────────────────────────────────
+
+    match /client_wallets/{clientId} {
+      allow read: if isOwner(clientId) || isAdmin();
+      allow write: if false; // Only Cloud Functions can modify wallets
+    }
+
+    match /client_credit_wallets/{clientId} {
+      allow read: if isSuperAdmin() || (isOwner(clientId) && isActiveClient());
+      allow write: if false;
+
+      match /transactions/{transactionId} {
+        allow read: if isSuperAdmin() || (isOwner(clientId) && isActiveClient());
+        allow write: if false;
+      }
+    }
+
+    match /recording_billing/{billingId} {
+      allow read: if isSuperAdmin()
+        || (isActiveClient() && resource.data.get('clientId', '') == request.auth.uid);
+      allow write: if false;
+    }
+
+    match /billing_settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+
+      match /history/{historyId} {
+        allow read: if isSuperAdmin();
+        allow write: if false;
+      }
+    }
+
+    match /worker_wallets/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false; // Only Cloud Functions can modify wallets
+    }
+
+    match /platform_earnings/{docId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only Cloud Functions can modify
+    }
+
+    // Super admin commission wallet (Model A markup). Credited only by
+    // Cloud Functions on task approval; read by admins for the dashboard.
+    match /super_admin_wallet/{docId} {
+      allow read: if isAdmin();
+      allow write: if false; // Only Cloud Functions can modify
+    }
+
+    // Wrong numbers reported by workers — surfaced to super admins only so they
+    // can clean the lead list / flag client data quality. Written by the
+    // submitTaskWork callable (Admin SDK); never payable, never re-queued.
+    match /wrong_numbers/{docId} {
+      allow read: if isSuperAdmin();
+      allow write: if false; // Only Cloud Functions can modify
+    }
+
+    // ─── Platform Settings Collection ──────────────────────────
+    match /platform_settings/{docId} {
+      allow read: if isAuthenticated();
+      allow write: if isSuperAdmin();
+    }
+    
+    // ─── Admins Collection ─────────────────────────────────────
+    match /admins/{adminId} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow write: if false; // Only Cloud Functions can create transactions
+    }
+
+    // ─── Campaigns ─────────────────────────────────────────────
+    match /campaigns/{campaignId} {
+      // Admins read/write all
+      allow read, write: if isAdmin();
+
+      // Active team leaders can inspect every internal campaign, but all
+      // campaign mutations still go through the protected callable.
+      allow read: if isTeamLeader();
+
+      // Clients can read their own campaigns
+      allow read: if isAuthenticated() && resource.data.clientId == request.auth.uid;
+
+      // Campaign creation goes through the createCampaign callable, which
+      // atomically reserves the budget from the client's wallet.
+      allow create: if false;
+
+      // Client campaign edits and active/paused transitions go through callable
+      // functions. This keeps ownership, pricing, limits, counters, approval
+      // state, reporting data and server timestamps authoritative.
+      allow update: if false;
+
+      // Campaign deletion is restricted to admins and server-side lifecycle
+      // jobs. The Admin SDK bypasses these rules for scheduled expiry cleanup.
+    }
+
+    // ─── Campaign Leads ────────────────────────────────────────
+    // Leads uploaded by clients and distributed to workers via tasks.
+    match /campaign_leads/{leadId} {
+      allow read: if isAdmin();
+      allow read: if isTeamLeader();
+      // Trusted admins may clean up only unallocated leads. Server-side
+      // campaign deletion continues through the Admin SDK.
+      allow delete: if isAdmin()
+        && resource.data.get('taskId', null) == null;
+
+      // Clients can read their own campaigns' leads
+      allow read: if isAuthenticated() && isCampaignOwner(resource.data.campaignId);
+
+      // Fast path: leads carry the owning clientId, so a client can read/list
+      // their own leads directly (used by the client dashboard aggregates)
+      // without a per-doc campaign lookup.
+      allow read: if isAuthenticated()
+        && resource.data.get('clientId', '') == request.auth.uid;
+
+      // Trusted admin upload paths remain available. Client uploads go through
+      // createCampaignLeads, which validates ownership/account state, enforces
+      // campaign capacity, deduplicates, and updates counters atomically.
+      allow create: if isAdmin()
+        && !request.resource.data.keys()
+             .hasAny(['callId', 'recordingUrl', 'callDuration']);
+
+      // A lead may be allocated to a task once. After that, its task and
+      // campaign ownership are immutable, including for portal admins.
+      allow update: if isAdmin()
+        && request.resource.data.get('campaignId', null) == resource.data.get('campaignId', null)
+        && (
+          request.resource.data.get('taskId', null) == resource.data.get('taskId', null) ||
+          (
+            resource.data.get('taskId', null) == null &&
+            request.resource.data.get('taskId', null) is string &&
+            request.resource.data.taskId.size() > 0
+          )
+        );
+
+      // Workers can read ANY lead that is:
+      //   1. still 'pending' (so they can query for unclaimed leads), OR
+      //   2. assigned to them (for 'in_progress' recovery queries)
+      // This covers both single-doc reads AND collection .where() queries.
+      allow read: if isAuthenticated() && (
+        resource.data.status == 'pending' ||
+        resource.data.assignedTo == request.auth.uid
+      );
+
+    }
+
+    // ─── Lead Uploads ──────────────────────────────────────────
+    match /lead_uploads/{uploadId} {
+      allow read, write: if isAdmin();
+      allow read: if isAuthenticated() && isCampaignOwner(resource.data.campaignId);
+      // Upload history and counters are written only by trusted backend/admin
+      // paths so clients cannot fabricate processing or reporting results.
+      allow create, update, delete: if false;
+    }
+
+    // ─── Call Logs (Twilio Recordings) ────────────────────────
+    // Created by Cloud Functions (webhook) with recording URLs.
+    match /call_logs/{callLogId} {
+      // Workers can read their own call logs (to fetch recording URLs)
+      allow read: if isAuthenticated() &&
+        (resource.data.userId == request.auth.uid || isAdmin());
+
+      // Only Cloud Functions (webhook) can create/update/delete
+      allow create, update, delete: if false;
+    }
+
+    match /work_reports/{reportId} {
+      allow read: if isAdmin()
+        || (isActiveClient() && isCampaignOwner(resource.data.get('campaignId', '')));
+      allow write: if false;
+    }
+
+    // ─── Fail-closed default ───────────────────────────────────
+    // Any collection not explicitly defined above is denied
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

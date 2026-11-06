@@ -1,0 +1,58 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "functions": [
+    {
+      "codebase": "default",
+      "source": "functions",
+      "runtime": "nodejs22"
+    }
+  ],
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "sherize-bpo",
+          "appId": "1:1008144551131:android:5ade2d212b245f915e90fe",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "sherize-bpo",
+          "configurations": {
+            "android": "1:1008144551131:android:5ade2d212b245f915e90fe",
+            "ios": "1:1008144551131:ios:acf646c0ac46fcb75e90fe",
+            "web": "1:1008144551131:web:b48994be5a8d14475e90fe"
+          }
+        }
+      }
+    }
+  },
+  "emulators": {
+    "auth": { "port": 9099 },
+    "functions": { "port": 5001 },
+    "firestore": { "port": 8080 },
+    "storage": { "port": 9199 },
+    "ui": { "enabled": true }
+  },
+  "hosting": {
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}
