@@ -16,8 +16,29 @@ class AdminLoginScreen extends StatefulWidget {
   State<AdminLoginScreen> createState() => _AdminLoginScreenState();
 }
 
-class _AdminLoginScreenState extends State<AdminLoginScreen>
-    with SingleTickerProviderStateMixin {
+class _AdminLoginScreenState extends State<AdminLoginScreen> {
+  static const Color _headerIndigo = Color(0xFF6366F1);
+  static const Color _referenceDeepIndigo = Color(0xFF3C2FE3);
+  static const Color _referenceIndigo = Color(0xFF4638E5);
+  static const Color _referenceBlueViolet = Color(0xFF5144E7);
+  static const Color _referenceViolet = Color(0xFF675BE9);
+  static const Color _referenceSoftViolet = Color(0xFF8176EA);
+  static const Color _referenceLavenderViolet = Color(0xFF9B91F0);
+
+  static const LinearGradient _blueReferenceGradient = LinearGradient(
+    colors: [
+      _referenceDeepIndigo,
+      _referenceIndigo,
+      _referenceBlueViolet,
+      _referenceViolet,
+      _referenceSoftViolet,
+      _referenceLavenderViolet,
+    ],
+    stops: [0.0, 0.20, 0.42, 0.64, 0.84, 1.0],
+    begin: Alignment.centerLeft,
+    end: Alignment.centerRight,
+  );
+
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -26,36 +47,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
   bool _isLoading = false;
   String? _errorMessage;
 
-  late AnimationController _animController;
-  late Animation<double> _fadeAnim;
-  late Animation<Offset> _slideAnim;
-
-  @override
-  void initState() {
-    super.initState();
-    _animController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    _fadeAnim = CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOut,
-    );
-    _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.15),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _animController,
-      curve: Curves.easeOutCubic,
-    ));
-    _animController.forward();
-  }
-
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
-    _animController.dispose();
     super.dispose();
   }
 
@@ -96,342 +91,382 @@ class _AdminLoginScreenState extends State<AdminLoginScreen>
     }
   }
 
+  InputDecoration _buildInputDecoration(
+    BuildContext _, {
+    required String labelText,
+    required IconData icon,
+    Widget? suffixIcon,
+  }) {
+    return InputDecoration(
+      labelText: labelText,
+      labelStyle: const TextStyle(
+        color: AppColors.textLabel,
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+      ),
+      floatingLabelStyle: const TextStyle(
+        color: AppColors.primary,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
+      prefixIcon: Icon(
+        icon,
+        size: 19,
+        color: AppColors.primary,
+      ),
+      suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: AppColors.surfaceElevated,
+      contentPadding: const EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: 17,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        borderSide: const BorderSide(color: AppColors.border),
+      ),
+      disabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        borderSide: const BorderSide(color: AppColors.borderLight),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        borderSide: const BorderSide(color: AppColors.error),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        borderSide: const BorderSide(color: AppColors.error, width: 1.5),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final inputFillColor = isDark ? Colors.white.withValues(alpha: 0.07) : AppColors.background.withValues(alpha: 0.5);
-    final inputTextStyle = TextStyle(
+    final isCompact = MediaQuery.sizeOf(context).width < 360;
+    const inputFillColor = AppColors.surfaceElevated;
+    const inputBorderColor = AppColors.border;
+    const inputTextStyle = TextStyle(
       fontSize: 15,
-      fontWeight: FontWeight.w500,
-      color: isDark ? Colors.white : AppColors.textDark,
+      fontWeight: FontWeight.w600,
+      color: AppColors.textDark,
     );
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF121212) : AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSizes.screenPaddingH,
-              vertical: AppSizes.xxl,
+      resizeToAvoidBottomInset: true,
+      backgroundColor: _headerIndigo,
+      body: Stack(
+        children: [
+          Positioned.fill(
+            child: Column(
+              children: [
+                Expanded(
+                  flex: 34,
+                  child: DecoratedBox(
+                    decoration: const BoxDecoration(color: _headerIndigo),
+                  ),
+                ),
+                Expanded(
+                  flex: 66,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.vertical(
+                        top: Radius.circular(AppSizes.radiusXxl),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            child: FadeTransition(
-              opacity: _fadeAnim,
-              child: SlideTransition(
-                position: _slideAnim,
+          ),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(
+                  isCompact ? AppSizes.base : AppSizes.screenPaddingH,
+                  isCompact ? AppSizes.sm : AppSizes.md,
+                  isCompact ? AppSizes.base : AppSizes.screenPaddingH,
+                  AppSizes.xxl + MediaQuery.viewInsetsOf(context).bottom,
+                ),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
+                  constraints: const BoxConstraints(maxWidth: 440),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      // ── Logo ──────────────────────────────
-                      Transform.translate(
-                        offset: const Offset(20, 0), // Nudge right for visual centering
-                        child: Image.asset(
-                          'assets/images/sherize_logo.png',
-                          width: 240,
-                          height: 240,
-                          fit: BoxFit.contain,
+                      Container(
+                        width: double.infinity,
+                        height: isCompact ? 240 : 270,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSizes.xl,
                         ),
-                      ),
-
-                      Transform.translate(
-                        offset: const Offset(0, -60), // Reduced offset to prevent overlap with logo text
                         child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // ── Title ─────────────────────────────
-                            const Text(
+                            Expanded(
+                              child: Center(
+                                child: Image.asset(
+                                  'assets/images/sherize_logo.png',
+                                  width: isCompact ? 196 : 228,
+                                  height: isCompact ? 196 : 228,
+                                  fit: BoxFit.contain,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: AppSizes.sm),
+                            Text(
                               'Admin Login',
+                              textAlign: TextAlign.center,
                               style: TextStyle(
-                                color: AppColors.textDark,
-                                fontSize: 26,
+                                color: Colors.black,
+                                fontSize: isCompact ? 20 : 27,
                                 fontWeight: FontWeight.w800,
                                 letterSpacing: -0.5,
-                              ),
-                            ),
-                            const SizedBox(height: AppSizes.xs),
-                            const Text(
-                              'Sign in to access the admin panel',
-                              style: TextStyle(
-                                color: AppColors.textMuted,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            const SizedBox(height: AppSizes.md), // Precise gap before card
-
-                            // ── Error Banner (Nested) ──────────────
-                            if (_errorMessage != null) ...[
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(AppSizes.md),
-                                decoration: BoxDecoration(
-                                  color: AppColors.error.withValues(alpha: 0.08),
-                                  borderRadius:
-                                      BorderRadius.circular(AppSizes.radiusMd),
-                                  border: Border.all(
-                                    color: AppColors.error.withValues(alpha: 0.3),
-                                  ),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      LucideIcons.alertCircle,
-                                      color: AppColors.error,
-                                      size: 20,
-                                    ),
-                                    const SizedBox(width: AppSizes.sm),
-                                    Expanded(
-                                      child: Text(
-                                        _errorMessage!,
-                                        style: const TextStyle(
-                                          color: AppColors.error,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(height: AppSizes.lg),
-                            ],
-
-                            // ── Login Form Card (Nested) ──────────
-                            Container(
-                              padding: const EdgeInsets.all(AppSizes.xl),
-                              decoration: BoxDecoration(
-                                color: AppColors.surface,
-                                borderRadius:
-                                    BorderRadius.circular(AppSizes.radiusLg),
-                                border: Border.all(color: AppColors.border),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.04),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Form(
-                                key: _formKey,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    // ── Email Field ───────────────
-                                    const Text(
-                                      'Email Address',
-                                      style: TextStyle(
-                                        color: AppColors.textBody,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSizes.sm),
-                                    TextFormField(
-                                      controller: _emailController,
-                                      keyboardType: TextInputType.emailAddress,
-                                      textInputAction: TextInputAction.next,
-                                      style: inputTextStyle,
-                                      decoration: InputDecoration(
-                                        hintText: 'admin@human_bpo.com',
-                                        hintStyle: TextStyle(
-                                          color: isDark ? Colors.white38 : AppColors.textPlaceholder,
-                                        ),
-                                        prefixIcon: Icon(
-                                          LucideIcons.mail,
-                                          size: 18,
-                                          color: isDark ? Colors.white38 : null,
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                          horizontal: 16,
-                                        ),
-                                        filled: true,
-                                        fillColor: inputFillColor,
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                              AppSizes.radiusMd),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                              AppSizes.radiusMd),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                              AppSizes.radiusMd),
-                                          borderSide: const BorderSide(
-                                            color: AppColors.primary,
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSizes.xl),
-
-                                    // ── Password Field ────────────
-                                    const Text(
-                                      'Password',
-                                      style: TextStyle(
-                                        color: AppColors.textBody,
-                                        fontSize: 13,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSizes.sm),
-                                    TextFormField(
-                                      controller: _passwordController,
-                                      obscureText: _obscurePassword,
-                                      textInputAction: TextInputAction.done,
-                                      onFieldSubmitted: (_) => _handleLogin(),
-                                      style: inputTextStyle,
-                                      decoration: InputDecoration(
-                                        hintText: '••••••••',
-                                        hintStyle: TextStyle(
-                                          color: isDark ? Colors.white38 : AppColors.textPlaceholder,
-                                        ),
-                                        prefixIcon: Icon(
-                                          LucideIcons.lock,
-                                          size: 18,
-                                          color: isDark ? Colors.white38 : null,
-                                        ),
-                                        suffixIcon: IconButton(
-                                          onPressed: () => setState(() =>
-                                              _obscurePassword =
-                                                  !_obscurePassword),
-                                          icon: Icon(
-                                            _obscurePassword
-                                                ? LucideIcons.eyeOff
-                                                : LucideIcons.eye,
-                                            size: 18,
-                                            color: isDark ? Colors.white54 : null,
-                                          ),
-                                        ),
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                          vertical: 16,
-                                          horizontal: 16,
-                                        ),
-                                        filled: true,
-                                        fillColor: inputFillColor,
-                                        border: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                              AppSizes.radiusMd),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        enabledBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                              AppSizes.radiusMd),
-                                          borderSide: BorderSide.none,
-                                        ),
-                                        focusedBorder: OutlineInputBorder(
-                                          borderRadius: BorderRadius.circular(
-                                              AppSizes.radiusMd),
-                                          borderSide: const BorderSide(
-                                            color: AppColors.primary,
-                                            width: 1.5,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: AppSizes.xxl),
-
-                                    // ── Login Button ──────────────
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: AppSizes.buttonHeight,
-                                      child: ElevatedButton(
-                                        onPressed: _isLoading
-                                            ? null
-                                            : _handleLogin,
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          foregroundColor: Colors.white,
-                                          disabledBackgroundColor:
-                                              AppColors.primary
-                                                  .withValues(alpha: 0.6),
-                                          disabledForegroundColor: Colors.white
-                                              .withValues(alpha: 0.8),
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius: BorderRadius.circular(
-                                              AppSizes.radiusMd,
-                                            ),
-                                          ),
-                                          elevation: 0,
-                                        ),
-                                        child: _isLoading
-                                            ? const SizedBox(
-                                                width: 22,
-                                                height: 22,
-                                                child:
-                                                    CircularProgressIndicator(
-                                                  color: Colors.white,
-                                                  strokeWidth: 2.5,
-                                                ),
-                                              )
-                                            : const Row(
-                                                mainAxisAlignment:
-                                                    MainAxisAlignment.center,
-                                                children: [
-                                                  Icon(LucideIcons.logIn,
-                                                      size: 20),
-                                                  SizedBox(width: 10),
-                                                  Text(
-                                                    'Login as Admin',
-                                                    style: TextStyle(
-                                                      fontSize: 16,
-                                                      fontWeight:
-                                                          FontWeight.w700,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: AppSizes.md),
-
-                            // ── Back to Worker Login ──────────────
-                            TextButton.icon(
-                              onPressed: _isLoading
-                                  ? null
-                                  : () {
-                                      Navigator.of(context).pushReplacementNamed(
-                                        AppRoutes.login,
-                                      );
-                                    },
-                              icon: const Icon(
-                                LucideIcons.arrowLeft,
-                                size: 16,
-                                color: AppColors.textMuted,
-                              ),
-                              label: const Text(
-                                'Back to Login',
-                                style: TextStyle(
-                                  color: AppColors.textMuted,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                ),
                               ),
                             ),
                           ],
                         ),
                       ),
+                      const SizedBox(
+                        height: 30,
+                      ),
 
+                      // ── Logo ──────────────────────────────
+                      Column(
+                        children: [
+                          const Text(
+                            'Sign in to access the admin panel',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: AppSizes.xl),
+                          // ── Title ─────────────────────────────
+                          // ── Error Banner (Nested) ──────────────
+                          if (_errorMessage != null) ...[
+                            Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.all(AppSizes.md),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.08),
+                                borderRadius:
+                                    BorderRadius.circular(AppSizes.radiusLg),
+                                border: Border.all(
+                                  color: AppColors.error.withValues(alpha: 0.3),
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(
+                                    LucideIcons.alertCircle,
+                                    color: AppColors.error,
+                                    size: 20,
+                                  ),
+                                  const SizedBox(width: AppSizes.sm),
+                                  Expanded(
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: const TextStyle(
+                                        color: AppColors.error,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: AppSizes.lg),
+                          ],
+
+                          // ── Login Form Card (Nested) ──────────
+                          Form(
+                            key: _formKey,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                // ── Email Field ───────────────
+                                TextFormField(
+                                  controller: _emailController,
+                                  keyboardType: TextInputType.emailAddress,
+                                  textInputAction: TextInputAction.next,
+                                  style: inputTextStyle,
+                                  decoration: _buildInputDecoration(
+                                    context,
+                                    labelText: 'Email address',
+                                    icon: LucideIcons.mail,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSizes.lg),
+
+                                // ── Password Field ────────────
+                                TextFormField(
+                                  controller: _passwordController,
+                                  obscureText: _obscurePassword,
+                                  textInputAction: TextInputAction.done,
+                                  onFieldSubmitted: (_) => _handleLogin(),
+                                  style: inputTextStyle,
+                                  decoration: InputDecoration(
+                                    hintText: '••••••••',
+                                    hintStyle: TextStyle(
+                                      color: AppColors.textPlaceholder,
+                                    ),
+                                    prefixIcon: Icon(
+                                      LucideIcons.lock,
+                                      size: 19,
+                                      color: AppColors.primary,
+                                    ),
+                                    suffixIcon: IconButton(
+                                      onPressed: () => setState(() =>
+                                          _obscurePassword = !_obscurePassword),
+                                      icon: Icon(
+                                        _obscurePassword
+                                            ? LucideIcons.eyeOff
+                                            : LucideIcons.eye,
+                                        size: 18,
+                                        color: AppColors.textMuted,
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      vertical: 16,
+                                      horizontal: 16,
+                                    ),
+                                    filled: true,
+                                    fillColor: inputFillColor,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          AppSizes.radiusLg),
+                                      borderSide: BorderSide(
+                                        color: inputBorderColor,
+                                      ),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          AppSizes.radiusLg),
+                                      borderSide: BorderSide(
+                                        color: inputBorderColor,
+                                      ),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          AppSizes.radiusLg),
+                                      borderSide: const BorderSide(
+                                        color: AppColors.primary,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSizes.xxl),
+
+                                // ── Login Button ──────────────
+                                Container(
+                                  width: double.infinity,
+                                  height: AppSizes.buttonHeightLg,
+                                  decoration: BoxDecoration(
+                                    gradient: _isLoading
+                                        ? LinearGradient(
+                                            colors: [
+                                              _referenceDeepIndigo.withValues(
+                                                alpha: 0.60,
+                                              ),
+                                              _referenceSoftViolet.withValues(
+                                                alpha: 0.60,
+                                              ),
+                                            ],
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                          )
+                                        : _blueReferenceGradient,
+                                    borderRadius: BorderRadius.circular(
+                                      AppSizes.radiusLg,
+                                    ),
+                                    boxShadow: _isLoading
+                                        ? null
+                                        : [
+                                            BoxShadow(
+                                              color: _referenceDeepIndigo
+                                                  .withValues(alpha: 0.24),
+                                              blurRadius: 16,
+                                              offset: const Offset(0, 6),
+                                            ),
+                                          ],
+                                  ),
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: _isLoading ? null : _handleLogin,
+                                    child: Center(
+                                      child: _isLoading
+                                          ? const SizedBox(
+                                              width: 22,
+                                              height: 22,
+                                              child: CircularProgressIndicator(
+                                                color: Colors.white,
+                                                strokeWidth: 2.5,
+                                              ),
+                                            )
+                                          : const Text(
+                                              'Login as Admin',
+                                              style: TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.w800,
+                                                letterSpacing: 0.1,
+                                              ),
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: AppSizes.md),
+
+                          // ── Back to Worker Login ──────────────
+                          TextButton.icon(
+                            onPressed: _isLoading
+                                ? null
+                                : () {
+                                    Navigator.of(context).pushReplacementNamed(
+                                      AppRoutes.login,
+                                    );
+                                  },
+                            icon: Icon(
+                              LucideIcons.arrowLeft,
+                              size: 16,
+                              color: AppColors.textMuted,
+                            ),
+                            label: Text(
+                              'Back to Login',
+                              style: TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
-

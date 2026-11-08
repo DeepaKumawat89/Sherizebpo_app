@@ -8,6 +8,7 @@ import '../../core/constants/constants.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../routes.dart';
 import '../../widgets/custom_button.dart';
+import '../../widgets/custom_popup_menu.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({Key? key}) : super(key: key);
@@ -270,13 +271,13 @@ class _SignupScreenState extends State<SignupScreen> {
                 // ── Gender ─────────────────────────────────────────
                 _buildLabel('Gender'),
                 const SizedBox(height: AppSizes.sm),
-                DropdownButtonFormField<String>(
+                CustomPopupMenuFormField<String>(
                   initialValue: _gender,
                   decoration: _inputDecoration('Select gender'),
                   items: const [
-                    DropdownMenuItem(value: 'Female', child: Text('Female')),
-                    DropdownMenuItem(value: 'Male', child: Text('Male')),
-                    DropdownMenuItem(value: 'Other', child: Text('Other')),
+                    CustomPopupMenuItem(value: 'Female', label: 'Female'),
+                    CustomPopupMenuItem(value: 'Male', label: 'Male'),
+                    CustomPopupMenuItem(value: 'Other', label: 'Other'),
                   ],
                   onChanged: (v) => setState(() => _gender = v ?? 'Female'),
                   validator: (v) => (v == null || v.isEmpty)

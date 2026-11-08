@@ -101,36 +101,64 @@ class _DashboardScreenState extends State<DashboardScreen>
             return CustomScrollView(
               slivers: [
                 // ── Custom App Bar ───────────────────────────────
-                _buildAppBar(context, firstName, data, isDark),
+                _buildAppBar(
+                  context,
+                  firstName,
+                  userName.toString(),
+                  data,
+                  isDark,
+                ),
 
                 // ── Dashboard Content ────────────────────────────
                 SliverPadding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.screenPaddingH,
+                  padding: EdgeInsets.fromLTRB(
+                    MediaQuery.sizeOf(context).width < 360
+                        ? AppSizes.base
+                        : AppSizes.screenPaddingH,
+                    AppSizes.xl,
+                    MediaQuery.sizeOf(context).width < 360
+                        ? AppSizes.base
+                        : AppSizes.screenPaddingH,
+                    AppSizes.xxxl,
                   ),
                   sliver: SliverList(
                     delegate: SliverChildListDelegate([
-                      const SizedBox(height: AppSizes.lg),
                       
                       // ── Global Announcement Banner ──
                       if (settings.announcement.trim().isNotEmpty)
                         Container(
-                          margin: const EdgeInsets.only(bottom: AppSizes.lg),
-                          padding: const EdgeInsets.all(AppSizes.md),
+                          margin: const EdgeInsets.only(bottom: AppSizes.xl),
+                          padding: const EdgeInsets.all(AppSizes.base),
                           decoration: BoxDecoration(
-                            color: isDark ? AppColors.primary.withValues(alpha: 0.12) : AppColors.primarySoft,
-                            borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                            color: isDark
+                                ? AppColors.primary.withValues(alpha: 0.12)
+                                : AppColors.primarySoft,
+                            borderRadius:
+                                BorderRadius.circular(AppSizes.radiusXl),
                             border: Border.all(
-                              color: isDark 
-                                ? AppColors.primary.withValues(alpha: 0.25)
-                                : AppColors.primaryMuted.withValues(alpha: 0.5),
+                              color: isDark
+                                  ? AppColors.primary.withValues(alpha: 0.24)
+                                  : AppColors.primaryMuted,
                             ),
+                            boxShadow:
+                                isDark ? null : AppDecorations.shadowSm,
                           ),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Icon(LucideIcons.megaphone, color: AppColors.primary, size: 20),
-                              const SizedBox(width: AppSizes.sm),
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: AppDecorations.iconBox(
+                                  color: AppColors.primary,
+                                ),
+                                child: const Icon(
+                                  LucideIcons.megaphone,
+                                  color: AppColors.primary,
+                                  size: 19,
+                                ),
+                              ),
+                              const SizedBox(width: AppSizes.md),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -138,18 +166,22 @@ class _DashboardScreenState extends State<DashboardScreen>
                                     Text(
                                       'Announcement',
                                       style: TextStyle(
-                                        color: isDark ? AppColors.primaryLight : AppColors.primaryDark,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
+                                        color: isDark
+                                            ? AppColors.primaryLight
+                                            : AppColors.primaryDark,
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 14,
                                       ),
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: AppSizes.xs),
                                     Text(
                                       settings.announcement,
                                       style: TextStyle(
-                                        color: isDark ? Colors.white.withValues(alpha: 0.9) : AppColors.textDark,
-                                        height: 1.4,
-                                        fontSize: 14,
+                                        color: isDark
+                                            ? Colors.white70
+                                            : AppColors.textBody,
+                                        height: 1.45,
+                                        fontSize: 13,
                                       ),
                                     ),
                                   ],
@@ -162,7 +194,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                       // ── Earnings Card ──
                       if (settings.earningsSystemEnabled) ...[
                         _buildEarningsSection(data, user.uid),
-                        const SizedBox(height: AppSizes.xl),
+                        const SizedBox(height: AppSizes.xxl),
                       ],
 
                       // ── Onboarding Checklist ──
@@ -170,13 +202,10 @@ class _DashboardScreenState extends State<DashboardScreen>
 
                       // ── Task Summary ──
                       _buildTaskSummary(user.uid),
-                      const SizedBox(height: AppSizes.xl),
+                      const SizedBox(height: AppSizes.xxl),
 
                       // ── Quick Actions ──
                       _buildQuickActions(context, data, isDark, settings.earningsSystemEnabled),
-                      const SizedBox(height: AppSizes.xxxl),
-
-                      const SizedBox(height: AppSizes.xxxl),
                     ]),
                   ),
                 ),
@@ -204,7 +233,12 @@ class _DashboardScreenState extends State<DashboardScreen>
   // APP BAR
   // ═══════════════════════════════════════════════════════════
   Widget _buildAppBar(
-      BuildContext context, String firstName, Map<String, dynamic> data, bool isDark) {
+    BuildContext context,
+    String firstName,
+    String userName,
+    Map<String, dynamic> data,
+    bool isDark,
+  ) {
     final hour = DateTime.now().hour;
     String greeting;
     IconData greetIcon;
@@ -222,78 +256,208 @@ class _DashboardScreenState extends State<DashboardScreen>
     final initial = firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U';
 
     return SliverAppBar(
-      expandedHeight: 180,
+      expandedHeight: 200,
+      collapsedHeight: 72,
       floating: false,
       pinned: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(AppSizes.radiusXxl),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      backgroundColor:
+          isDark ? AppColors.secondary : AppColors.primaryDark,
       surfaceTintColor: Colors.transparent,
       automaticallyImplyLeading: false,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          padding: EdgeInsets.only(
-            top: MediaQuery.of(context).padding.top + AppSizes.md,
-            left: AppSizes.screenPaddingH,
-            right: AppSizes.screenPaddingH,
-            bottom: AppSizes.lg,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.end,
+      flexibleSpace: LayoutBuilder(
+        builder: (context, constraints) {
+          final settings = context
+              .dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
+          final collapseRange = settings == null
+              ? 0.0
+              : settings.maxExtent - settings.minExtent;
+          final collapseProgress = collapseRange <= 0
+              ? 0.0
+              : (1 -
+                      (settings!.currentExtent - settings.minExtent) /
+                          collapseRange)
+                  .clamp(0.0, 1.0);
+          final pinnedOpacity = Curves.easeOut.transform(
+            ((collapseProgress - 0.62) / 0.38).clamp(0.0, 1.0),
+          );
+
+          return Stack(
+            fit: StackFit.expand,
             children: [
-              Row(
-                children: [
-                  // Avatar
-                  GestureDetector(
-                    onTap: () => _selectTab(2),
-                    child: _buildAvatar(initial, data),
+              FlexibleSpaceBar(
+                collapseMode: CollapseMode.pin,
+                background: ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(AppSizes.radiusXxl),
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: isDark
+                  ? AppDecorations.darkGradient
+                  : AppDecorations.primaryGradient,
+            ),
+            child: Stack(
+              children: [
+              Positioned(
+                right: -56,
+                top: -36,
+                child: Container(
+                  width: 180,
+                  height: 180,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.primaryLight.withValues(alpha: 0.18),
                   ),
-                  const Spacer(),
-                  // Inbox / Mail
-                  _buildMailIconButton(context),
-                  const SizedBox(width: AppSizes.sm),
-                  // Notification Bell
-                  _buildIconButton(
-                    context: context,
-                    icon: LucideIcons.bell,
-                    onTap: () =>
-                        Navigator.pushNamed(context, AppRoutes.notifications),
-                  ),
-                  const SizedBox(width: AppSizes.sm),
-                  // Settings
-                  _buildIconButton(
-                    context: context,
-                    icon: LucideIcons.settings,
-                    onTap: () =>
-                        Navigator.pushNamed(context, AppRoutes.settings),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: AppSizes.lg),
-              Row(
-                children: [
-                  Icon(greetIcon, size: 18, color: AppColors.accent),
-                  const SizedBox(width: AppSizes.sm),
-                  Text(
-                    greeting,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: isDark ? Colors.white54 : AppColors.textMuted,
-                          fontWeight: FontWeight.w500,
+              Positioned(
+                left: -52,
+                bottom: -80,
+                child: Container(
+                  width: 164,
+                  height: 164,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.violet.withValues(alpha: 0.16),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  MediaQuery.sizeOf(context).width < 360
+                      ? AppSizes.base
+                      : AppSizes.screenPaddingH,
+                  MediaQuery.paddingOf(context).top + AppSizes.md,
+                  MediaQuery.sizeOf(context).width < 360
+                      ? AppSizes.base
+                      : AppSizes.screenPaddingH,
+                  AppSizes.xl,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Row(
+                      children: [
+                        GestureDetector(
+                          onTap: () => _selectTab(2),
+                          child: _buildAvatar(initial, data),
                         ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                firstName,
-                style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                      color: isDark ? Colors.white : AppColors.textDark,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 28,
+                        const Spacer(),
+                        _buildMailIconButton(context),
+                        const SizedBox(width: AppSizes.sm),
+                        _buildIconButton(
+                          context: context,
+                          icon: LucideIcons.bell,
+                          onTap: () => Navigator.pushNamed(
+                            context,
+                            AppRoutes.notifications,
+                          ),
+                        ),
+                        const SizedBox(width: AppSizes.sm),
+                        _buildIconButton(
+                          context: context,
+                          icon: LucideIcons.settings,
+                          onTap: () => Navigator.pushNamed(
+                            context,
+                            AppRoutes.settings,
+                          ),
+                        ),
+                      ],
                     ),
+                    const Spacer(),
+                    Row(
+                      children: [
+                        Icon(greetIcon,
+                            size: 17, color: AppColors.accentLight),
+                        const SizedBox(width: AppSizes.sm),
+                        Text(
+                          greeting,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white70,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSizes.xs),
+                    Text(
+                      firstName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 30,
+                                letterSpacing: -0.6,
+                              ),
+                    ),
+                  ],
+                ),
+              ),
+              ],
+            ),
+          ),
+                ),
+              ),
+              IgnorePointer(
+                ignoring: pinnedOpacity == 0,
+                child: Opacity(
+                  opacity: pinnedOpacity,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: MediaQuery.sizeOf(context).width < 360
+                            ? AppSizes.base
+                            : AppSizes.screenPaddingH,
+                      ),
+                      child: SizedBox(
+                        height: 72,
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () => _selectTab(2),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildAvatar(initial, data),
+                                const SizedBox(width: AppSizes.md),
+                                Flexible(
+                                  child: Text(
+                                    userName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
-          ),
-        ),
+          );
+        },
       ),
     );
   }
@@ -310,7 +474,7 @@ class _DashboardScreenState extends State<DashboardScreen>
       decoration: BoxDecoration(
         gradient: AppDecorations.primaryLightGradient,
         shape: BoxShape.circle,
-        border: Border.all(color: Theme.of(context).cardColor, width: 2),
+        border: Border.all(color: Colors.white, width: 2),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withValues(alpha: 0.2),
@@ -355,26 +519,26 @@ class _DashboardScreenState extends State<DashboardScreen>
     required VoidCallback onTap,
     bool hasBadge = false,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 40,
-        height: 40,
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
-          color: Theme.of(context).cardColor,
+          color: Colors.white.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
-          boxShadow: isDark ? null : AppDecorations.shadowSm,
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.20),
+          ),
         ),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            Icon(icon, size: 20, color: isDark ? Colors.white70 : AppColors.textBody),
+            Icon(icon, size: 20, color: Colors.white),
             if (hasBadge)
               Positioned(
-                top: 8,
-                right: 8,
+                top: 7,
+                right: 7,
                 child: Container(
                   width: 8,
                   height: 8,
@@ -548,10 +712,7 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ═══════════════════════════════════════════════════════════
   Widget _buildQuickActions(BuildContext context, Map<String, dynamic> data,
       bool isDark, bool earningsEnabled) {
-    // Build the action cards, omitting "Earnings" when the earnings system is
-    // disabled, then lay them out two-per-row (a lone trailing card keeps its
-    // half-width via a Spacer so the grid stays aligned).
-    final cards = <Widget>[
+    final cards = <_QuickActionCard>[
       _QuickActionCard(
         icon: LucideIcons.phoneCall,
         label: 'Find Tasks',
@@ -583,33 +744,47 @@ class _DashboardScreenState extends State<DashboardScreen>
       ),
     ];
 
-    final rows = <Widget>[];
-    for (int i = 0; i < cards.length; i += 2) {
-      if (i > 0) rows.add(const SizedBox(height: AppSizes.md));
-      rows.add(Row(
-        children: [
-          Expanded(child: cards[i]),
-          const SizedBox(width: AppSizes.md),
-          if (i + 1 < cards.length)
-            Expanded(child: cards[i + 1])
-          else
-            const Spacer(),
-        ],
-      ));
-    }
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Quick Actions',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: isDark ? Colors.white : AppColors.textDark,
-                fontWeight: FontWeight.w700,
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 22,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(AppSizes.radiusRound),
               ),
+            ),
+            const SizedBox(width: AppSizes.sm),
+            Text(
+              'Quick Actions',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: isDark ? Colors.white : AppColors.textDark,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.3,
+                  ),
+            ),
+          ],
         ),
-        const SizedBox(height: AppSizes.md),
-        ...rows,
+        const SizedBox(height: AppSizes.base),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final columns = constraints.maxWidth < 330 ? 1 : 2;
+            final cardWidth = columns == 1
+                ? constraints.maxWidth
+                : (constraints.maxWidth - AppSizes.md) / 2;
+            return Wrap(
+              spacing: AppSizes.md,
+              runSpacing: AppSizes.md,
+              children: [
+                for (final card in cards)
+                  SizedBox(width: cardWidth, child: card),
+              ],
+            );
+          },
+        ),
       ],
     );
   }
@@ -797,48 +972,67 @@ class _QuickActionCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(AppSizes.lg),
+        constraints: const BoxConstraints(minHeight: 142),
+        padding: const EdgeInsets.all(AppSizes.base),
         decoration: BoxDecoration(
           color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-          border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
-          boxShadow: isDark ? null : AppDecorations.shadowSm,
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : AppColors.border.withValues(alpha: 0.7),
+          ),
+          boxShadow: isDark ? null : AppDecorations.shadowMd,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient: gradient,
-                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-                boxShadow: [
-                  BoxShadow(
-                    color: (gradient as LinearGradient)
-                        .colors
-                        .first
-                        .withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: gradient,
+                    borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (gradient as LinearGradient)
+                            .colors
+                            .first
+                            .withValues(alpha: 0.22),
+                        blurRadius: 12,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Icon(icon, size: 20, color: Colors.white),
+                  child: Icon(icon, size: 21, color: Colors.white),
+                ),
+                const Spacer(),
+                Icon(
+                  LucideIcons.arrowUpRight,
+                  size: 17,
+                  color: isDark ? Colors.white38 : AppColors.textPlaceholder,
+                ),
+              ],
             ),
-            const SizedBox(height: AppSizes.md),
+            const SizedBox(height: AppSizes.base),
             Text(
               label,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
                     color: isDark ? Colors.white : AppColors.textDark,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.1,
                   ),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: AppSizes.xs),
             Text(
               subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: isDark ? Colors.white54 : AppColors.textMuted,
+                    height: 1.2,
                   ),
             ),
           ],

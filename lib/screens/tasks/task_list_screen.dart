@@ -50,46 +50,68 @@ class _TaskListScreenState extends State<TaskListScreen>
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Task Marketplace'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        toolbarHeight: 72,
+        backgroundColor:
+            isDark ? AppColors.secondary : AppColors.primaryDark,
+        flexibleSpace: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: isDark
+                ? AppDecorations.darkGradient
+                : AppDecorations.primaryGradient,
+          ),
+        ),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(
+            bottom: Radius.circular(AppSizes.radiusXxl),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: isDark ? Colors.white : AppColors.textDark,
-              fontSize: 22,
+              color: Colors.white,
+              fontSize: 23,
               fontWeight: FontWeight.w800,
               letterSpacing: -0.5,
             ),
-        iconTheme:
-            IconThemeData(color: isDark ? Colors.white : AppColors.textDark),
+        iconTheme: const IconThemeData(color: Colors.white),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(52),
+          preferredSize: const Size.fromHeight(64),
           child: Container(
-            margin: const EdgeInsets.symmetric(
-              horizontal: AppSizes.screenPaddingH,
+            margin: EdgeInsets.fromLTRB(
+              MediaQuery.sizeOf(context).width < 360
+                  ? AppSizes.base
+                  : AppSizes.screenPaddingH,
+              0,
+              MediaQuery.sizeOf(context).width < 360
+                  ? AppSizes.base
+                  : AppSizes.screenPaddingH,
+              AppSizes.md,
             ),
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: isDark
-                  ? Colors.white.withValues(alpha: 0.05)
-                  : AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppSizes.radiusRound),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.18),
+              ),
             ),
             child: TabBar(
               controller: _tabCtrl,
               indicatorSize: TabBarIndicatorSize.tab,
               indicator: BoxDecoration(
-                color: Theme.of(context).cardColor,
-                borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                boxShadow: isDark ? null : AppDecorations.shadowSm,
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(AppSizes.radiusRound),
               ),
               dividerColor: Colors.transparent,
               labelColor: AppColors.primary,
-              unselectedLabelColor:
-                  isDark ? Colors.white38 : AppColors.textMuted,
+              unselectedLabelColor: Colors.white70,
+              overlayColor:
+                  const MaterialStatePropertyAll<Color>(Colors.transparent),
               labelStyle: const TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w700,
               ),
               unselectedLabelStyle: const TextStyle(
                 fontSize: 14,
@@ -127,42 +149,66 @@ class _TaskListScreenState extends State<TaskListScreen>
   Widget _buildTaskSearchField() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSizes.screenPaddingH,
-        AppSizes.md,
-        AppSizes.screenPaddingH,
+      padding: EdgeInsets.fromLTRB(
+        MediaQuery.sizeOf(context).width < 360
+            ? AppSizes.base
+            : AppSizes.screenPaddingH,
+        AppSizes.lg,
+        MediaQuery.sizeOf(context).width < 360
+            ? AppSizes.base
+            : AppSizes.screenPaddingH,
         0,
       ),
-      child: TextField(
-        controller: _searchCtrl,
-        onChanged: (v) => setState(() => _searchQuery = v),
-        textInputAction: TextInputAction.search,
-        decoration: InputDecoration(
-          hintText: 'Search by Task ID (e.g. TSK-1234) or title',
-          prefixIcon: const Icon(LucideIcons.search, size: 18),
-          suffixIcon: _searchQuery.isNotEmpty
-              ? IconButton(
-                  icon: const Icon(LucideIcons.x, size: 18),
-                  tooltip: 'Clear',
-                  onPressed: () {
-                    _searchCtrl.clear();
-                    setState(() => _searchQuery = '');
-                    FocusScope.of(context).unfocus();
-                  },
-                )
-              : null,
-          isDense: true,
-          filled: true,
-          fillColor: isDark
-              ? Colors.white.withValues(alpha: 0.05)
-              : AppColors.surfaceVariant,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            borderSide: BorderSide.none,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor,
+          borderRadius: BorderRadius.circular(AppSizes.radiusXl),
+          border: Border.all(
+            color: isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : AppColors.border.withValues(alpha: 0.7),
           ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-            borderSide: BorderSide.none,
+          boxShadow: isDark ? null : AppDecorations.shadowSm,
+        ),
+        child: TextField(
+          controller: _searchCtrl,
+          onChanged: (v) => setState(() => _searchQuery = v),
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            hintText: 'Search by Task ID (e.g. TSK-1234) or title',
+            prefixIcon: const Icon(LucideIcons.search, size: 19),
+            suffixIcon: _searchQuery.isNotEmpty
+                ? Tooltip(
+                    message: 'Clear',
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        _searchCtrl.clear();
+                        setState(() => _searchQuery = '');
+                        FocusScope.of(context).unfocus();
+                      },
+                      child: const Padding(
+                        padding: EdgeInsets.all(AppSizes.md),
+                        child: Icon(LucideIcons.x, size: 18),
+                      ),
+                    ),
+                  )
+                : null,
+            isDense: true,
+            filled: true,
+            fillColor: Colors.transparent,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.base,
+              vertical: AppSizes.base,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSizes.radiusXl),
+              borderSide: BorderSide.none,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(AppSizes.radiusXl),
+              borderSide: BorderSide.none,
+            ),
           ),
         ),
       ),
@@ -228,7 +274,16 @@ class _TaskListScreenState extends State<TaskListScreen>
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.all(AppSizes.screenPaddingH),
+          padding: EdgeInsets.fromLTRB(
+            MediaQuery.sizeOf(context).width < 360
+                ? AppSizes.base
+                : AppSizes.screenPaddingH,
+            AppSizes.base,
+            MediaQuery.sizeOf(context).width < 360
+                ? AppSizes.base
+                : AppSizes.screenPaddingH,
+            AppSizes.xxl,
+          ),
           itemCount: docs.length,
           itemBuilder: (context, index) {
             final data = docs[index].data() as Map<String, dynamic>;
@@ -330,7 +385,16 @@ class _TaskListScreenState extends State<TaskListScreen>
         });
 
         return ListView(
-          padding: const EdgeInsets.all(AppSizes.screenPaddingH),
+          padding: EdgeInsets.fromLTRB(
+            MediaQuery.sizeOf(context).width < 360
+                ? AppSizes.base
+                : AppSizes.screenPaddingH,
+            AppSizes.xl,
+            MediaQuery.sizeOf(context).width < 360
+                ? AppSizes.base
+                : AppSizes.screenPaddingH,
+            AppSizes.xxl,
+          ),
           children: [
             _buildActiveSectionHeader(activeDocs.length),
             const SizedBox(height: AppSizes.sm),
@@ -363,19 +427,21 @@ class _TaskListScreenState extends State<TaskListScreen>
     return Row(
       children: [
         Container(
-          width: 28,
-          height: 28,
+          width: 36,
+          height: 36,
           decoration: BoxDecoration(
             gradient: AppDecorations.primaryGradient,
-            borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            boxShadow: AppDecorations.primaryShadow(alpha: 0.16),
           ),
-          child: const Icon(LucideIcons.zap, size: 14, color: Colors.white),
+          child: const Icon(LucideIcons.zap, size: 17, color: Colors.white),
         ),
         const SizedBox(width: AppSizes.sm),
         Text(
           'Active Tasks',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
+                letterSpacing: -0.2,
                 color: isDark ? Colors.white : AppColors.textDark,
               ),
         ),
@@ -747,12 +813,16 @@ class _AvailableTaskCardState extends State<_AvailableTaskCard> {
     final myQuota = ((totalLeads + slots - 1) ~/ slots).clamp(0, totalLeads);
 
     return Container(
-      padding: const EdgeInsets.all(AppSizes.lg),
+      padding: const EdgeInsets.all(AppSizes.xl),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-        border: Border.all(color: Theme.of(context).dividerColor),
-        boxShadow: isDark ? null : AppDecorations.shadowSm,
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : AppColors.border.withValues(alpha: 0.7),
+        ),
+        boxShadow: isDark ? null : AppDecorations.shadowMd,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -760,14 +830,15 @@ class _AvailableTaskCardState extends State<_AvailableTaskCard> {
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
                   gradient: AppDecorations.primaryGradient,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                  borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+                  boxShadow: AppDecorations.primaryShadow(alpha: 0.18),
                 ),
                 child: const Icon(LucideIcons.phoneCall,
-                    size: 20, color: Colors.white),
+                    size: 21, color: Colors.white),
               ),
               const SizedBox(width: AppSizes.md),
               Expanded(
@@ -776,8 +847,9 @@ class _AvailableTaskCardState extends State<_AvailableTaskCard> {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
                             color: isDark ? Colors.white : AppColors.textDark,
                           ),
                       maxLines: 1,
@@ -786,7 +858,9 @@ class _AvailableTaskCardState extends State<_AvailableTaskCard> {
                     if (widget.data['clientName'] != null)
                       Text(
                         widget.data['clientName'],
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color:
                                   isDark ? Colors.white38 : AppColors.textMuted,
                             ),
@@ -809,8 +883,10 @@ class _AvailableTaskCardState extends State<_AvailableTaskCard> {
               ),
               if (earningsEnabled)
                 Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.md,
+                  vertical: AppSizes.sm,
+                ),
                 decoration: BoxDecoration(
                   color: isDark
                       ? AppColors.success.withValues(alpha: 0.15)
@@ -822,72 +898,127 @@ class _AvailableTaskCardState extends State<_AvailableTaskCard> {
                   style: TextStyle(
                     color:
                         isDark ? AppColors.successLight : AppColors.successDark,
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w800,
                     fontSize: 14,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: AppSizes.md),
-          Text(
-            widget.data['description'] ?? 'No description',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: isDark ? Colors.white60 : AppColors.textMuted,
-                ),
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
+          const SizedBox(height: AppSizes.base),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(AppSizes.md),
+            decoration: BoxDecoration(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : AppColors.surfaceVariant.withValues(alpha: 0.65),
+              borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+            ),
+            child: Text(
+              widget.data['description'] ?? 'No description',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: isDark ? Colors.white60 : AppColors.textMuted,
+                    height: 1.45,
+                  ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          const SizedBox(height: AppSizes.sm),
-          Text('Created: ${_formatDate(widget.data['createdAt'])}',
-              style: Theme.of(context).textTheme.bodySmall),
-          if (widget.data['publishedAt'] != null)
-            Text('Published: ${_formatDate(widget.data['publishedAt'])}',
-                style: Theme.of(context).textTheme.bodySmall),
           const SizedBox(height: AppSizes.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                LucideIcons.calendarClock,
+                size: 15,
+                color: isDark ? Colors.white38 : AppColors.textPlaceholder,
+              ),
+              const SizedBox(width: AppSizes.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Created: ${_formatDate(widget.data['createdAt'])}',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isDark
+                                ? Colors.white54
+                                : AppColors.textMuted,
+                          ),
+                    ),
+                    if (widget.data['publishedAt'] != null) ...[
+                      const SizedBox(height: AppSizes.xs),
+                      Text(
+                        'Published: ${_formatDate(widget.data['publishedAt'])}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: isDark
+                                  ? Colors.white54
+                                  : AppColors.textMuted,
+                            ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSizes.base),
           Divider(
               color: isDark
                   ? Colors.white.withValues(alpha: 0.05)
                   : AppColors.border.withValues(alpha: 0.3)),
-          const SizedBox(height: AppSizes.md),
+          const SizedBox(height: AppSizes.base),
           Row(
             children: [
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? AppColors.warning.withValues(alpha: 0.15)
-                      : AppColors.warningBg,
-                  borderRadius: BorderRadius.circular(AppSizes.radiusRound),
-                ),
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.list,
-                        size: 14,
-                        color: isDark
-                            ? AppColors.warningLight
-                            : AppColors.warningDark),
-                    const SizedBox(width: 4),
-                    Text(
-                      '$myQuota ${myQuota == 1 ? 'lead' : 'leads'} for you',
-                      style: TextStyle(
-                        color: isDark
-                            ? AppColors.warningLight
-                            : AppColors.warningDark,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.md,
+                    vertical: AppSizes.sm,
+                  ),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? AppColors.warning.withValues(alpha: 0.15)
+                        : AppColors.warningBg,
+                    borderRadius:
+                        BorderRadius.circular(AppSizes.radiusRound),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(LucideIcons.list,
+                          size: 14,
+                          color: isDark
+                              ? AppColors.warningLight
+                              : AppColors.warningDark),
+                      const SizedBox(width: AppSizes.xs),
+                      Flexible(
+                        child: Text(
+                          '$myQuota ${myQuota == 1 ? 'lead' : 'leads'} for you',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isDark
+                                ? AppColors.warningLight
+                                : AppColors.warningDark,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(width: AppSizes.sm),
               GestureDetector(
                 onTap: _isAccepting ? null : _acceptTask,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSizes.lg,
+                    vertical: AppSizes.md,
+                  ),
                   decoration: BoxDecoration(
                     gradient:
                         _isAccepting ? null : AppDecorations.primaryGradient,
@@ -906,7 +1037,7 @@ class _AvailableTaskCardState extends State<_AvailableTaskCard> {
                           style: TextStyle(
                               color: Colors.white,
                               fontSize: 13,
-                              fontWeight: FontWeight.w600)),
+                              fontWeight: FontWeight.w700)),
                 ),
               ),
             ],

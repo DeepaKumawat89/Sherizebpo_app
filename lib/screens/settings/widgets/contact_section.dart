@@ -6,6 +6,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/constants/constants.dart';
 import '../../../../widgets/custom_button.dart';
 import '../../../../widgets/custom_text_field.dart';
+import '../../../../widgets/custom_popup_menu.dart';
 import '../../../../services/support_service.dart';
 import '../../../../core/utils/snackbar_utils.dart';
 
@@ -261,34 +262,27 @@ class _ContactSectionState extends State<ContactSection> {
                         color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
                       ),
                     ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _issueType,
-                        isExpanded: true,
-                        dropdownColor: Theme.of(context).cardColor,
-                        icon: Icon(
-                          LucideIcons.chevronDown,
-                          color: isDark ? Colors.white54 : AppColors.textMuted,
-                          size: 20,
-                        ),
-                        onChanged: (String? newValue) {
-                          if (newValue != null) {
-                            setState(() => _issueType = newValue);
-                          }
-                        },
-                        items: _issueTypes.map<DropdownMenuItem<String>>((String value) {
-                          return DropdownMenuItem<String>(
-                            value: value,
-                            child: Text(
-                              value,
-                              style: TextStyle(
-                                color: isDark ? Colors.white : AppColors.textDark,
-                                fontSize: 15,
-                              ),
-                            ),
-                          );
-                        }).toList(),
+                    child: CustomPopupMenuFormField<String>(
+                      initialValue: _issueType,
+                      decoration: const InputDecoration(
+                        border: InputBorder.none,
+                        contentPadding: EdgeInsets.zero,
                       ),
+                      style: TextStyle(
+                        color: isDark ? Colors.white : AppColors.textDark,
+                        fontSize: 15,
+                      ),
+                      onChanged: (String? newValue) {
+                        if (newValue != null) {
+                          setState(() => _issueType = newValue);
+                        }
+                      },
+                      items: _issueTypes
+                          .map((value) => CustomPopupMenuItem<String>(
+                                value: value,
+                                label: value,
+                              ))
+                          .toList(),
                     ),
                   ),
                   const SizedBox(height: AppSizes.md),

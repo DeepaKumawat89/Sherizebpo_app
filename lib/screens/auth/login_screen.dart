@@ -18,6 +18,15 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  static const Color _headerIndigo = Color(0xFF6366F1);
+  static const Color _referenceDeepIndigo = Color(0xFF3C2FE3);
+  static const Color _referenceIndigo = Color(0xFF4638E5);
+  static const Color _referenceBlueViolet = Color(0xFF5144E7);
+  static const Color _referenceViolet = Color(0xFF675BE9);
+  static const Color _referenceSoftViolet = Color(0xFF8176EA);
+  static const Color _referenceLavenderViolet = Color(0xFF9B91F0);
+
+
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _employeeIdCtrl = TextEditingController();
@@ -158,23 +167,45 @@ class _LoginScreenState extends State<LoginScreen> {
 
   InputDecoration _decoration(String label, IconData icon) => InputDecoration(
         labelText: label,
-        prefixIcon: Icon(icon, size: 20, color: AppColors.textMuted),
+        labelStyle: const TextStyle(
+          color: AppColors.textLabel,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        floatingLabelStyle: const TextStyle(
+          color: _referenceDeepIndigo,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+        ),
+        prefixIcon: Icon(icon, size: 19, color: _referenceDeepIndigo),
         filled: true,
-        fillColor: AppColors.surface,
+        fillColor: AppColors.surfaceElevated,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
         errorMaxLines: 3,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
           borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
           borderSide: const BorderSide(color: AppColors.border),
         ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: const BorderSide(color: AppColors.borderLight),
+        ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: const BorderSide(color: _referenceDeepIndigo, width: 1.5),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: const BorderSide(color: AppColors.error),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
       );
 
@@ -277,34 +308,86 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
             ],
             const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: _loading || (_mobileLogin && _cooldownSeconds > 0)
-                  ? null
-                  : _mobileLogin
-                      ? _sendOtp
-                      : _login,
-              style: ElevatedButton.styleFrom(
-                minimumSize: const Size(double.infinity, 52),
-                backgroundColor: AppColors.primaryDark,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(AppSizes.radiusMd)),
+            FractionallySizedBox(
+              widthFactor: 0.50,
+              child: Container(
+                height: AppSizes.buttonHeightLg,
+                padding: const EdgeInsets.fromLTRB(24, 6, 6, 6),
+                decoration: BoxDecoration(
+                  color: _loading || (_mobileLogin && _cooldownSeconds > 0)
+                      ? Colors.indigo.shade500.withValues(alpha: 0.60)
+                      : Colors.indigo.shade500,
+                  borderRadius: BorderRadius.circular(100), // full pill
+                  boxShadow: _loading || (_mobileLogin && _cooldownSeconds > 0)
+                      ? null
+                      : [
+                          BoxShadow(
+                            color:
+                                const Color(0xFF0F1A4A).withValues(alpha: 0.22),
+                            blurRadius: 16,
+                            offset: const Offset(0, 6),
+                          ),
+                        ],
+                ),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _loading || (_mobileLogin && _cooldownSeconds > 0)
+                      ? null
+                      : _mobileLogin
+                          ? _sendOtp
+                          : _login,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Center(
+                          child: _loading
+                              ? const SizedBox(
+                                  width: 22,
+                                  height: 22,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                    semanticsLabel: 'Signing in',
+                                  ),
+                                )
+                              : Text(
+                                  _mobileLogin
+                                      ? _cooldownSeconds > 0
+                                          ? 'Resend in ${_cooldownSeconds}s'
+                                          : 'Send OTP'
+                                      : 'Sign in',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                        ),
+                      ),
+                      AspectRatio(
+                        aspectRatio: 1,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color:  Colors.white // soft purple circle
+                                .withValues(
+                              alpha: _loading ||
+                                      (_mobileLogin && _cooldownSeconds > 0)
+                                  ? 0.60
+                                  : 1.0,
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            color: Colors.indigo,
+                            size: 26,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              child: _loading
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                          semanticsLabel: 'Signing in'),
-                    )
-                  : Text(_mobileLogin
-                      ? _cooldownSeconds > 0
-                          ? 'Resend in ${_cooldownSeconds}s'
-                          : 'Send OTP'
-                      : 'Sign in'),
             ),
           ],
         ),
@@ -338,144 +421,202 @@ class _LoginScreenState extends State<LoginScreen> {
         if (shouldExit == true) SystemNavigator.pop();
       },
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        resizeToAvoidBottomInset: true,
+        backgroundColor: _headerIndigo,
         body: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 480),
-              child: SingleChildScrollView(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const SizedBox(height: 8),
-                    Center(
-                      child: ClipRect(
-                        key: const ValueKey('login-logo'),
-                        child: Align(
-                          widthFactor: 0.5,
-                          heightFactor: 0.5,
-                          alignment: const Alignment(-0.1, -0.4),
-                          child: Image.asset(
-                            'assets/images/sherize_logo.png',
-                            width: 320,
-                            height: 320,
-                            semanticLabel: 'Sherize',
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _mobileLogin ? 'Mobile login' : 'Welcome back',
-                      textAlign: TextAlign.center,
-                      style:
-                          Theme.of(context).textTheme.headlineSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textDark,
-                                letterSpacing: 0,
-                              ),
-                    ),
-                    const SizedBox(height: 24),
-                    if (!_mobileLogin) ...[
-                      SegmentedButton<bool>(
-                        segments: const [
-                          ButtonSegment(value: false, label: Text('Email')),
-                          ButtonSegment(
-                              value: true, label: Text('Employee ID')),
-                        ],
-                        selected: {_useEmployeeId},
-                        showSelectedIcon: false,
-                        direction: MediaQuery.sizeOf(context).width < 360 ||
-                                MediaQuery.textScalerOf(context).scale(14) > 20
-                            ? Axis.vertical
-                            : Axis.horizontal,
-                        onSelectionChanged: _loading
-                            ? null
-                            : (selection) => _changeMethod(
-                                mobile: false, employee: selection.single),
-                        style: SegmentedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                          textStyle: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0,
-                          ),
-                          selectedBackgroundColor: AppColors.primarySoft,
-                          selectedForegroundColor: AppColors.primaryDark,
-                          foregroundColor: AppColors.textBody,
-                          side: const BorderSide(color: AppColors.border),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                    _buildForm(),
-                    const SizedBox(height: 12),
-                    OutlinedButton.icon(
-                      onPressed: _loading
-                          ? null
-                          : () => _changeMethod(mobile: !_mobileLogin),
-                      icon: Icon(
-                        _mobileLogin
-                            ? LucideIcons.mail
-                            : LucideIcons.smartphone,
-                        size: 18,
-                      ),
-                      label: Text(
-                        _mobileLogin
-                            ? 'Login with email'
-                            : 'Login with mobile number',
-                        textAlign: TextAlign.center,
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 52),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 12),
-                        foregroundColor: AppColors.textBody,
-                        backgroundColor: AppColors.surface,
-                        side: const BorderSide(color: AppColors.border),
-                        shape: RoundedRectangleBorder(
-                          borderRadius:
-                              BorderRadius.circular(AppSizes.radiusMd),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 16,
+          bottom: false,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 360;
+              final headerHeight = isCompact ? 240.0 : 280.0;
+              final logoSize = isCompact ? 196.0 : 228.0;
+
+              return Column(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: headerHeight,
+                    decoration: const BoxDecoration(color: _headerIndigo),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.start,
                       children: [
-                        TextButton.icon(
-                          onPressed: _loading
-                              ? null
-                              : () => Navigator.of(context)
-                                  .pushReplacementNamed(AppRoutes.publicJobs),
-                          icon: const Icon(LucideIcons.briefcase, size: 16),
-                          label: const Text('Job Portal'),
-                          style: TextButton.styleFrom(
-                              minimumSize: const Size(0, 48),
-                              foregroundColor: AppColors.textMuted),
+                        SizedBox(height: isCompact ? 6 : 8),
+                        Image.asset(
+                          'assets/images/sherize_logo.png',
+                          width: logoSize,
+                          height: logoSize,
+                          fit: BoxFit.contain,
+                          semanticLabel: 'Sherize',
                         ),
-                        TextButton.icon(
-                          onPressed: _loading
-                              ? null
-                              : () => Navigator.pushNamed(
-                                  context, AppRoutes.adminLogin),
-                          icon: const Icon(LucideIcons.shieldCheck, size: 16),
-                          label: const Text('Admin Login'),
-                          style: TextButton.styleFrom(
-                              minimumSize: const Size(0, 48),
-                              foregroundColor: AppColors.textMuted),
+                        Transform.translate(
+                          offset: const Offset(0, -50),
+                          child: Text(
+                            _mobileLogin ? 'Mobile login' : 'Welcome back',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: Colors.white,
+                                  fontSize: isCompact ? 24 : 27,
+                                  letterSpacing: -0.5,
+                                ),
+                          ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    const DeveloperCredit(),
-                  ],
-                ),
-              ),
-            ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      width: double.infinity,
+                      decoration: const BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(AppSizes.radiusXxl),
+                        ),
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 440),
+                          child: SingleChildScrollView(
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            padding: EdgeInsets.fromLTRB(
+                              isCompact
+                                  ? AppSizes.base
+                                  : AppSizes.screenPaddingH,
+                              isCompact ? AppSizes.sm : AppSizes.md,
+                              isCompact
+                                  ? AppSizes.base
+                                  : AppSizes.screenPaddingH,
+                              AppSizes.xxl +
+                                  MediaQuery.viewInsetsOf(context).bottom,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                if (!_mobileLogin) ...[
+                                  SegmentedButton<bool>(
+                                    segments: const [
+                                      ButtonSegment(
+                                          value: false, label: Text('Email')),
+                                      ButtonSegment(
+                                          value: true,
+                                          label: Text('Employee ID')),
+                                    ],
+                                    selected: {_useEmployeeId},
+                                    showSelectedIcon: false,
+                                    direction:
+                                        MediaQuery.sizeOf(context).width <
+                                                    360 ||
+                                                MediaQuery.textScalerOf(context)
+                                                        .scale(14) >
+                                                    20
+                                            ? Axis.vertical
+                                            : Axis.horizontal,
+                                    onSelectionChanged: _loading
+                                        ? null
+                                        : (selection) => _changeMethod(
+                                            mobile: false,
+                                            employee: selection.single),
+                                    style: SegmentedButton.styleFrom(
+                                      minimumSize: const Size(0, 48),
+                                      textStyle: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w600,
+                                        letterSpacing: 0,
+                                      ),
+                                      selectedBackgroundColor:
+                                          _referenceLavenderViolet.withValues(
+                                              alpha: 0.18),
+                                      selectedForegroundColor:
+                                          _referenceDeepIndigo,
+                                      foregroundColor: AppColors.textBody,
+                                      side: const BorderSide(
+                                          color: AppColors.border),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                ],
+                                _buildForm(),
+                                const SizedBox(height: 12),
+                                OutlinedButton.icon(
+                                  onPressed: _loading
+                                      ? null
+                                      : () =>
+                                          _changeMethod(mobile: !_mobileLogin),
+                                  icon: Icon(
+                                    _mobileLogin
+                                        ? LucideIcons.mail
+                                        : LucideIcons.smartphone,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    _mobileLogin
+                                        ? 'Login with email'
+                                        : 'Login with mobile number',
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    minimumSize:
+                                        const Size(double.infinity, 52),
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16, vertical: 12),
+                                    foregroundColor: AppColors.textBody,
+                                    backgroundColor: AppColors.surface,
+                                    side: const BorderSide(
+                                        color: AppColors.border),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(
+                                          AppSizes.radiusMd),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 16),
+                                Wrap(
+                                  alignment: WrapAlignment.center,
+                                  spacing: 16,
+                                  children: [
+                                    TextButton.icon(
+                                      onPressed: _loading
+                                          ? null
+                                          : () => Navigator.of(context)
+                                              .pushReplacementNamed(
+                                                  AppRoutes.publicJobs),
+                                      icon: const Icon(LucideIcons.briefcase,
+                                          size: 16),
+                                      label: const Text('Job Portal'),
+                                      style: TextButton.styleFrom(
+                                          minimumSize: const Size(0, 48),
+                                          foregroundColor: AppColors.textMuted),
+                                    ),
+                                    TextButton.icon(
+                                      onPressed: _loading
+                                          ? null
+                                          : () => Navigator.pushNamed(
+                                              context, AppRoutes.adminLogin),
+                                      icon: const Icon(LucideIcons.shieldCheck,
+                                          size: 16),
+                                      label: const Text('Admin Login'),
+                                      style: TextButton.styleFrom(
+                                          minimumSize: const Size(0, 48),
+                                          foregroundColor: AppColors.textMuted),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                const DeveloperCredit(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),

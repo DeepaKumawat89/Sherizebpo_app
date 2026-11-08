@@ -10,9 +10,10 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/constants/constants.dart';
+import '../../core/theme/app_decorations.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../widgets/custom_button.dart';
-import '../../widgets/custom_text_field.dart';
+import '../../widgets/custom_popup_menu.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({Key? key}) : super(key: key);
@@ -297,16 +298,70 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   }
 
   Widget _buildSectionHeader(String title) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    IconData icon;
+    String subtitle;
+    switch (title) {
+      case 'Basic Information':
+        icon = LucideIcons.user;
+        subtitle = 'Your personal and contact details';
+        break;
+      case 'Address Information':
+        icon = LucideIcons.mapPin;
+        subtitle = 'Your current residential address';
+        break;
+      case 'Work Preferences':
+        icon = LucideIcons.briefcase;
+        subtitle = 'Language, education and experience';
+        break;
+      default:
+        icon = LucideIcons.headphones;
+        subtitle = 'Devices and connectivity available to you';
+    }
+
     return Padding(
-      padding: const EdgeInsets.only(top: AppSizes.xl, bottom: AppSizes.md),
-      child: Text(
-        title,
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontSize: 16,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
+      padding: const EdgeInsets.only(top: AppSizes.xxl, bottom: AppSizes.base),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: isDark
+                  ? AppColors.primary.withValues(alpha: 0.14)
+                  : AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            ),
+            child: Icon(icon, size: 19, color: AppColors.primary),
+          ),
+          const SizedBox(width: AppSizes.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: isDark ? Colors.white : AppColors.textDark,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
+                      ),
+                ),
+                const SizedBox(height: AppSizes.xs),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color:
+                            isDark ? Colors.white54 : AppColors.textMuted,
+                        height: 1.3,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -314,125 +369,303 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   InputDecoration _buildInputDecoration(BuildContext context, String label, IconData icon,
       {Widget? suffix}) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDark ? Colors.white.withValues(alpha: 0.10) : AppColors.border;
     return InputDecoration(
       labelText: label,
       labelStyle: TextStyle(
-          color: isDark ? Colors.white38 : AppColors.textBody,
+          color: isDark ? Colors.white70 : AppColors.textLabel,
           fontSize: 13,
-          fontWeight: FontWeight.w500),
-      prefixIcon: Icon(icon, size: 20, color: isDark ? Colors.white38 : AppColors.textMuted),
+          fontWeight: FontWeight.w600),
+      floatingLabelStyle: const TextStyle(
+        color: AppColors.primary,
+        fontSize: 13,
+        fontWeight: FontWeight.w700,
+      ),
+      prefixIcon: Icon(
+        icon,
+        size: 19,
+        color: isDark ? AppColors.primaryLight : AppColors.primary,
+      ),
       suffixIcon: suffix,
       filled: true,
-      fillColor: Theme.of(context).cardColor,
+      fillColor: isDark
+          ? Colors.white.withValues(alpha: 0.04)
+          : AppColors.surfaceElevated,
       contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSizes.base, vertical: AppSizes.base),
       border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: BorderSide(color: borderColor)),
       enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          borderSide: BorderSide.none),
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: BorderSide(color: borderColor)),
+      disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: BorderSide(color: borderColor.withValues(alpha: 0.7))),
       focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
           borderSide:
               const BorderSide(color: AppColors.primary, width: 1.5)),
+      errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: const BorderSide(color: AppColors.error)),
+      focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+          borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
+    );
+  }
+
+  Widget _buildAvatarFallback() {
+    final initial = _nameController.text.trim().isNotEmpty
+        ? _nameController.text.trim().characters.first.toUpperCase()
+        : 'U';
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: AppDecorations.primaryLightGradient,
+      ),
+      child: Center(
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 360
+        ? AppSizes.base
+        : AppSizes.screenPaddingH;
 
     return Scaffold(
+      resizeToAvoidBottomInset: true,
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: const Text('Edit Profile'),
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: Colors.white,
+        foregroundColor: AppColors.textDark,
+        toolbarHeight: 72,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
-          color: isDark ? Colors.white : AppColors.textDark,
-          fontSize: 22,
+          color: AppColors.textDark,
+          fontSize: 24,
           fontWeight: FontWeight.w800,
           letterSpacing: -0.5,
         ),
-        iconTheme: IconThemeData(color: isDark ? Colors.white : AppColors.textDark),
+        iconTheme: const IconThemeData(color: AppColors.textDark),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(AppSizes.screenPaddingH),
-              child: Form(
+          : SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  AppSizes.lg,
+                  horizontalPadding,
+                  AppSizes.xxl + MediaQuery.viewInsetsOf(context).bottom,
+                ),
+                child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     // ── Profile Photo ─────────────────────────────
-                    Center(
-                      child: GestureDetector(
-                        onTap: () {
-                          if (!_isSaving) _pickImage();
-                        },
-                        child: Stack(
-                          children: [
-                            Container(
-                              width: AppSizes.avatarLg,
-                              height: AppSizes.avatarLg,
-                              decoration: BoxDecoration(
-                                color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.primaryLight,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: Theme.of(context).cardColor, width: 4),
-                                boxShadow: isDark ? null : [
-                                  BoxShadow(
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.1),
-                                    blurRadius: 10,
-                                    offset: const Offset(0, 4),
-                                  )
+                    Container(
+                      padding: const EdgeInsets.all(AppSizes.xl),
+                      decoration: BoxDecoration(
+                        gradient: isDark
+                            ? AppDecorations.darkGradient
+                            : AppDecorations.primaryGradient,
+                        borderRadius:
+                            BorderRadius.circular(AppSizes.radiusXl),
+                        boxShadow: isDark
+                            ? null
+                            : AppDecorations.primaryShadow(alpha: 0.18),
+                      ),
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final compact = constraints.maxWidth < 300;
+                          final avatar = Semantics(
+                            button: true,
+                            label: 'Change profile photo',
+                            child: GestureDetector(
+                              behavior: HitTestBehavior.opaque,
+                              onTap: _isSaving ? null : _pickImage,
+                              child: Stack(
+                                clipBehavior: Clip.none,
+                                children: [
+                                  Container(
+                                    width: AppSizes.avatarXl,
+                                    height: AppSizes.avatarXl,
+                                    padding:
+                                        const EdgeInsets.all(AppSizes.xs),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.secondary
+                                              .withValues(alpha: 0.20),
+                                          blurRadius: 20,
+                                          offset: const Offset(0, 8),
+                                        ),
+                                      ],
+                                    ),
+                                    child: ClipOval(
+                                      child: _newProfileBytes != null
+                                          ? Image.memory(
+                                              _newProfileBytes!,
+                                              fit: BoxFit.cover,
+                                            )
+                                          : (_existingProfileImageUrl != null &&
+                                                  _existingProfileImageUrl!
+                                                      .isNotEmpty)
+                                              ? Image.network(
+                                                  _existingProfileImageUrl!,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) =>
+                                                      _buildAvatarFallback(),
+                                                )
+                                              : _buildAvatarFallback(),
+                                    ),
+                                  ),
+                                  Positioned(
+                                    right: -2,
+                                    bottom: 2,
+                                    child: Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.primary,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: Colors.white,
+                                          width: 3,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.secondary
+                                                .withValues(alpha: 0.18),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 3),
+                                          ),
+                                        ],
+                                      ),
+                                      child: const Icon(
+                                        LucideIcons.camera,
+                                        color: Colors.white,
+                                        size: 16,
+                                      ),
+                                    ),
+                                  ),
                                 ],
                               ),
-                              child: ClipOval(
-                                child: _newProfileBytes != null
-                                    ? Image.memory(_newProfileBytes!,
-                                        fit: BoxFit.cover)
-                                    : (_existingProfileImageUrl != null &&
-                                            _existingProfileImageUrl!.isNotEmpty)
-                                        ? Image.network(
-                                            _existingProfileImageUrl!,
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) =>
-                                                    Center(
-                                              child: Icon(LucideIcons.user,
-                                                  size: 32, color: isDark ? Colors.white24 : Colors.white),
-                                            ),
-                                          )
-                                        : Center(
-                                            child: Icon(LucideIcons.user,
-                                                size: 32, color: isDark ? Colors.white24 : Colors.white),
-                                          ),
-                              ),
                             ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                      color: Theme.of(context).cardColor, width: 2),
-                                ),
-                                child: const Icon(LucideIcons.camera,
-                                    color: Colors.white, size: 14),
+                          );
+                          final details = Column(
+                            crossAxisAlignment: compact
+                                ? CrossAxisAlignment.center
+                                : CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Profile photo',
+                                textAlign:
+                                    compact ? TextAlign.center : TextAlign.left,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: -0.3,
+                                    ),
+                              ),
+                              const SizedBox(height: AppSizes.xs),
+                              Text(
+                                'Add a clear photo so your profile is easy to recognise.',
+                                textAlign:
+                                    compact ? TextAlign.center : TextAlign.left,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      color: Colors.white70,
+                                      height: 1.4,
+                                    ),
+                              ),
+                              const SizedBox(height: AppSizes.md),
+                              GestureDetector(
+                                behavior: HitTestBehavior.opaque,
+                                onTap: _isSaving ? null : _pickImage,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: AppSizes.md,
+                                    vertical: AppSizes.sm,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(
+                                      AppSizes.radiusRound,
+                                    ),
+                                    border: Border.all(
+                                      color: Colors.white
+                                          .withValues(alpha: 0.20),
+                                    ),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(
+                                        LucideIcons.image,
+                                        size: 15,
+                                        color: Colors.white,
+                                      ),
+                                      SizedBox(width: AppSizes.sm),
+                                      Text(
+                                        'Choose photo',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                          ],
-                        ),
+                            ],
+                          );
+
+                          if (compact) {
+                            return Column(
+                              children: [
+                                avatar,
+                                const SizedBox(height: AppSizes.lg),
+                                details,
+                              ],
+                            );
+                          }
+                          return Row(
+                            children: [
+                              avatar,
+                              const SizedBox(width: AppSizes.lg),
+                              Expanded(child: details),
+                            ],
+                          );
+                        },
                       ),
                     ),
 
@@ -491,23 +724,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: AppSizes.md),
 
-                    DropdownButtonFormField<String>(
+                    CustomPopupMenuFormField<String>(
                       initialValue: _gender,
                       decoration:
                           _buildInputDecoration(context, 'Gender', LucideIcons.users),
-                      dropdownColor: Theme.of(context).cardColor,
-                      icon: Icon(LucideIcons.chevronDown,
-                          color: isDark ? Colors.white38 : AppColors.textMuted, size: 20),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: isDark ? Colors.white : AppColors.textDark, fontSize: 14),
-                      items: _genderOptions.map((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value,
-                              style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textDark)),
-                        );
-                      }).toList(),
+                          color: isDark ? Colors.white : AppColors.textDark,
+                          fontSize: 14),
+                      items: _genderOptions
+                          .map((value) => CustomPopupMenuItem(
+                                value: value,
+                                label: value,
+                              ))
+                          .toList(),
                       onChanged: _isSaving
                           ? null
                           : (value) => setState(() => _gender = value),
@@ -598,37 +827,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: AppSizes.md),
 
-                    Row(
-                      children: [
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _cityController,
-                            label: 'City',
-                            hintText: 'Auto-filled',
-                            readOnly: _isSaving,
-                          ),
-                        ),
-                        const SizedBox(width: AppSizes.md),
-                        Expanded(
-                          child: CustomTextField(
-                            controller: _stateController,
-                            label: 'State',
-                            hintText: 'Auto-filled',
-                            readOnly: _isSaving,
-                          ),
-                        ),
-                      ],
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final city = CustomTextField(
+                          controller: _cityController,
+                          label: 'City',
+                          hintText: 'Auto-filled',
+                          prefixIcon: LucideIcons.mapPin,
+                          readOnly: _isSaving,
+                        );
+                        final state = CustomTextField(
+                          controller: _stateController,
+                          label: 'State',
+                          hintText: 'Auto-filled',
+                          prefixIcon: LucideIcons.map,
+                          readOnly: _isSaving,
+                        );
+                        if (constraints.maxWidth < 340) {
+                          return Column(
+                            children: [
+                              city,
+                              const SizedBox(height: AppSizes.md),
+                              state,
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(child: city),
+                            const SizedBox(width: AppSizes.md),
+                            Expanded(child: state),
+                          ],
+                        );
+                      },
                     ),
 
                     // ── Work Preferences ──────────────────────────
                     _buildSectionHeader('Work Preferences'),
-                    DropdownButtonFormField<String>(
+                    CustomPopupMenuFormField<String>(
                       initialValue: _language,
                       decoration: _buildInputDecoration(
                           context, 'Preferred Language', LucideIcons.languages),
-                      dropdownColor: Theme.of(context).cardColor,
-                      icon: Icon(LucideIcons.chevronDown,
-                          color: isDark ? Colors.white38 : AppColors.textMuted, size: 20),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: isDark ? Colors.white : AppColors.textDark, fontSize: 14),
                       items: [
@@ -639,11 +879,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                         'Kannada',
                         'Malayalam'
                       ].map((String value) {
-                        return DropdownMenuItem<String>(
+                        return CustomPopupMenuItem<String>(
                           value: value,
-                          child: Text(value,
-                              style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textDark)),
+                          label: value,
                         );
                       }).toList(),
                       onChanged: _isSaving
@@ -653,21 +891,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: AppSizes.md),
 
-                    DropdownButtonFormField<String>(
+                    CustomPopupMenuFormField<String>(
                       initialValue: _education,
                       decoration: _buildInputDecoration(
                           context, 'Education Level', LucideIcons.graduationCap),
-                      dropdownColor: Theme.of(context).cardColor,
-                      icon: Icon(LucideIcons.chevronDown,
-                          color: isDark ? Colors.white38 : AppColors.textMuted, size: 20),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: isDark ? Colors.white : AppColors.textDark, fontSize: 14),
                       items: _educationOptions.map((String value) {
-                        return DropdownMenuItem<String>(
+                        return CustomPopupMenuItem<String>(
                           value: value,
-                          child: Text(value,
-                              style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textDark)),
+                          label: value,
                         );
                       }).toList(),
                       onChanged: _isSaving
@@ -686,36 +919,71 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
                     // ── Equipment Details ─────────────────────────
                     _buildSectionHeader('Equipment Details'),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: Text('Headset Available',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: isDark ? Colors.white : AppColors.textDark,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w500)),
-                      value: _headsetAvailable,
-                      activeThumbColor: AppColors.primary,
-                      onChanged: _isSaving
-                          ? null
-                          : (value) =>
-                              setState(() => _headsetAvailable = value),
+                    Container(
+                      margin: const EdgeInsets.only(bottom: AppSizes.md),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : AppColors.surfaceElevated,
+                        borderRadius:
+                            BorderRadius.circular(AppSizes.radiusLg),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.white.withValues(alpha: 0.10)
+                              : AppColors.border,
+                        ),
+                      ),
+                      child: SwitchListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSizes.base,
+                          vertical: AppSizes.xs,
+                        ),
+                        secondary: Icon(
+                          LucideIcons.headphones,
+                          size: 19,
+                          color: isDark
+                              ? AppColors.primaryLight
+                              : AppColors.primary,
+                        ),
+                        title: Text(
+                          'Headset Available',
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: isDark
+                                        ? Colors.white
+                                        : AppColors.textDark,
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                        subtitle: Text(
+                          _headsetAvailable ? 'Available' : 'Not available',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: isDark
+                                        ? Colors.white54
+                                        : AppColors.textMuted,
+                                  ),
+                        ),
+                        value: _headsetAvailable,
+                        activeThumbColor: AppColors.primary,
+                        onChanged: _isSaving
+                            ? null
+                            : (value) =>
+                                setState(() => _headsetAvailable = value),
+                      ),
                     ),
-                    DropdownButtonFormField<String>(
+                    CustomPopupMenuFormField<String>(
                       initialValue: _deviceType,
                       decoration: _buildInputDecoration(
                           context, 'Device Type', LucideIcons.smartphone),
-                      dropdownColor: Theme.of(context).cardColor,
-                      icon: Icon(LucideIcons.chevronDown,
-                          color: isDark ? Colors.white38 : AppColors.textMuted, size: 20),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: isDark ? Colors.white : AppColors.textDark, fontSize: 14),
                       items: ['Android', 'iPhone', 'Laptop', 'Desktop']
                           .map((String value) {
-                        return DropdownMenuItem<String>(
+                        return CustomPopupMenuItem<String>(
                           value: value,
-                          child: Text(value,
-                              style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textDark)),
+                          label: value,
                         );
                       }).toList(),
                       onChanged: _isSaving
@@ -724,22 +992,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               setState(() => _deviceType = value),
                     ),
                     const SizedBox(height: AppSizes.md),
-                    DropdownButtonFormField<String>(
+                    CustomPopupMenuFormField<String>(
                       initialValue: _internetType,
                       decoration: _buildInputDecoration(
                           context, 'Internet Type', LucideIcons.wifi),
-                      dropdownColor: Theme.of(context).cardColor,
-                      icon: Icon(LucideIcons.chevronDown,
-                          color: isDark ? Colors.white38 : AppColors.textMuted, size: 20),
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: isDark ? Colors.white : AppColors.textDark, fontSize: 14),
                       items: ['WiFi', 'Mobile Data', 'Broadband']
                           .map((String value) {
-                        return DropdownMenuItem<String>(
+                        return CustomPopupMenuItem<String>(
                           value: value,
-                          child: Text(value,
-                              style: TextStyle(
-                                  color: isDark ? Colors.white : AppColors.textDark)),
+                          label: value,
                         );
                       }).toList(),
                       onChanged: _isSaving
@@ -749,18 +1012,129 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     ),
                     const SizedBox(height: AppSizes.xxxl),
 
-                    CustomButton(
-                      label: 'Save Profile Changes',
-                      icon: LucideIcons.checkCircle,
-                      isLoading: _isSaving,
-                      isDisabled: _isSaving,
-                      onPressed: _saveProfile,
+                    Container(
+                      padding: const EdgeInsets.all(AppSizes.xs),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).cardColor,
+                        borderRadius:
+                            BorderRadius.circular(AppSizes.radiusLg),
+                        boxShadow: isDark ? null : AppDecorations.shadowSm,
+                      ),
+                      child: CustomButton(
+                        label: 'Save Profile Changes',
+                        icon: LucideIcons.checkCircle,
+                        isLoading: _isSaving,
+                        isDisabled: _isSaving,
+                        height: AppSizes.buttonHeightLg,
+                        fontSize: 16,
+                        onPressed: _saveProfile,
+                      ),
                     ),
                     const SizedBox(height: AppSizes.xxl),
                   ],
                 ),
+                ),
               ),
             ),
+    );
+  }
+}
+
+/// Screen-local field styling keeps the Edit Profile redesign isolated from
+/// every other form in the application.
+class CustomTextField extends StatelessWidget {
+  const CustomTextField({
+    super.key,
+    this.controller,
+    required this.label,
+    required this.hintText,
+    this.prefixIcon,
+    this.keyboardType = TextInputType.text,
+    this.readOnly = false,
+    this.validator,
+  });
+
+  final TextEditingController? controller;
+  final String label;
+  final String hintText;
+  final IconData? prefixIcon;
+  final TextInputType keyboardType;
+  final bool readOnly;
+  final FormFieldValidator<String>? validator;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDark ? Colors.white.withValues(alpha: 0.10) : AppColors.border;
+
+    OutlineInputBorder border(Color color, {double width = 1}) {
+      return OutlineInputBorder(
+        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+        borderSide: BorderSide(color: color, width: width),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: isDark ? Colors.white70 : AppColors.textLabel,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.1,
+              ),
+        ),
+        const SizedBox(height: AppSizes.sm),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          readOnly: readOnly,
+          validator: validator,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: isDark ? Colors.white : AppColors.textDark,
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+              ),
+          decoration: InputDecoration(
+            hintText: hintText,
+            hintStyle: TextStyle(
+              color: isDark ? Colors.white30 : AppColors.textPlaceholder,
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+            ),
+            prefixIcon: prefixIcon == null
+                ? null
+                : Icon(
+                    prefixIcon,
+                    size: 19,
+                    color:
+                        isDark ? AppColors.primaryLight : AppColors.primary,
+                  ),
+            filled: true,
+            fillColor: isDark
+                ? Colors.white.withValues(alpha: 0.04)
+                : AppColors.surfaceElevated,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.base,
+              vertical: AppSizes.base,
+            ),
+            border: border(borderColor),
+            enabledBorder: border(borderColor),
+            focusedBorder: border(AppColors.primary, width: 1.5),
+            errorBorder: border(AppColors.error),
+            focusedErrorBorder: border(AppColors.error, width: 1.5),
+            errorStyle: const TextStyle(
+              color: AppColors.error,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

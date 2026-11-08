@@ -34,12 +34,16 @@ class OnboardingChecklistCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(AppSizes.lg),
+      padding: const EdgeInsets.all(AppSizes.xl),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
-        boxShadow: isDark ? null : AppDecorations.shadowSm,
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : AppColors.border.withValues(alpha: 0.7),
+        ),
+        boxShadow: isDark ? null : AppDecorations.shadowMd,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -48,11 +52,11 @@ class OnboardingChecklistCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 decoration: AppDecorations.iconBox(color: AppColors.accent),
                 child: const Icon(LucideIcons.rocket,
-                    size: 18, color: AppColors.accent),
+                    size: 19, color: AppColors.accent),
               ),
               const SizedBox(width: AppSizes.md),
               Expanded(
@@ -61,8 +65,9 @@ class OnboardingChecklistCard extends StatelessWidget {
                   children: [
                     Text(
                       'Get Started',
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w700,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: -0.2,
                           ),
                     ),
                     Text(
@@ -165,12 +170,12 @@ class _ChecklistItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(AppSizes.md),
+        padding: const EdgeInsets.all(AppSizes.base),
         decoration: BoxDecoration(
           color: isDone
               ? (isDark ? AppColors.successLight.withValues(alpha: 0.1) : AppColors.successBg.withValues(alpha: 0.5))
               : (isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.surfaceVariant.withValues(alpha: 0.5)),
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          borderRadius: BorderRadius.circular(AppSizes.radiusLg),
           border: Border.all(
             color: isDone
                 ? (isDark ? AppColors.successLight.withValues(alpha: 0.2) : AppColors.success.withValues(alpha: 0.2))

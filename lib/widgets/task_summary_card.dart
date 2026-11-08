@@ -27,12 +27,16 @@ class TaskSummaryCard extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
-      padding: const EdgeInsets.all(AppSizes.lg),
+      padding: const EdgeInsets.all(AppSizes.xl),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
         borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
-        boxShadow: isDark ? null : AppDecorations.shadowSm,
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : AppColors.border.withValues(alpha: 0.7),
+        ),
+        boxShadow: isDark ? null : AppDecorations.shadowMd,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -41,18 +45,19 @@ class TaskSummaryCard extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 40,
+                height: 40,
                 decoration: AppDecorations.iconBox(color: AppColors.primary),
                 child: const Icon(LucideIcons.clipboardList,
-                    size: 18, color: AppColors.primary),
+                    size: 19, color: AppColors.primary),
               ),
               const SizedBox(width: AppSizes.md),
               Expanded(
                 child: Text(
                   'Tasks Overview',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w700,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.2,
                       ),
                 ),
               ),
@@ -67,7 +72,7 @@ class TaskSummaryCard extends StatelessWidget {
                         style:
                             Theme.of(context).textTheme.labelMedium?.copyWith(
                                   color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
+                                  fontWeight: FontWeight.w700,
                                 ),
                       ),
                       const SizedBox(width: 2),
@@ -90,7 +95,7 @@ class TaskSummaryCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(AppSizes.radiusRound),
                 child: LinearProgressIndicator(
                   value: value,
-                  minHeight: 8,
+                  minHeight: 7,
                   backgroundColor: isDark 
                       ? Colors.white.withValues(alpha: 0.05)
                       : AppColors.surfaceVariant,
@@ -119,7 +124,7 @@ class TaskSummaryCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSizes.lg),
+          const SizedBox(height: AppSizes.base),
 
           // Stat Chips
           Row(
@@ -175,23 +180,43 @@ class _StatChip extends StatelessWidget {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.sm, vertical: AppSizes.sm),
+          horizontal: AppSizes.sm,
+          vertical: AppSizes.md,
+        ),
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(AppSizes.radiusMd),
           border: Border.all(color: color.withValues(alpha: 0.12)),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(icon, size: 13, color: color),
+                const SizedBox(width: AppSizes.xs),
+                Flexible(
+                  child: Text(
+                    value,
+                    style: TextStyle(
+                      color: color,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSizes.xs),
             Text(
-              value,
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 color: color,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],

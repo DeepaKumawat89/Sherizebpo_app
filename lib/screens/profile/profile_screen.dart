@@ -1,7 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/constants.dart';
@@ -11,6 +10,7 @@ import '../../services/platform_settings_service.dart';
 import '../../routes.dart';
 import '../../widgets/custom_button.dart';
 import '../../widgets/developer_credit.dart';
+import 'profile_information_screen.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({Key? key}) : super(key: key);
@@ -127,16 +127,10 @@ class ProfileScreen extends StatelessWidget {
               data['phoneNumber'] ??
               currentUser.phoneNumber ??
               'No Phone';
-          final String rawEmail =
-              (data['email'] ?? currentUser.email ?? '').toString();
-          // Workers see their Employee ID — never the internal <id>@sherize.app
-          // address, which exists only to satisfy Firebase Auth's email login.
           final String employeeIdRaw = (data['employeeId'] ?? '').toString().trim();
           final String employeeId = employeeIdRaw.isNotEmpty
               ? employeeIdRaw
-              : (rawEmail.contains('@')
-                  ? rawEmail.split('@').first
-                  : (data['workerId'] ?? '').toString());
+              : (data['workerId'] ?? '').toString().trim();
           final String profileImageUrl = data['profileImage'] ??
               data['profileImageUrl'] ??
               data['avatar_url'] ??
@@ -163,35 +157,37 @@ class ProfileScreen extends StatelessWidget {
               data['total_earnings'] ??
               data['earnings'] ??
               0;
-          final num completedTasks = data['totalTasksCompleted'] ??
-              data['tasks_completed'] ??
-              data['completedTasks'] ??
-              0;
-          final num userRating = (data['rating'] as num?)?.toDouble() ?? 0.0;
           final String initial =
               userName.isNotEmpty ? userName.characters.first.toUpperCase() : 'U';
 
           return CustomScrollView(
             slivers: [
               // ── Profile Header ──
-              SliverToBoxAdapter(
-                child: ProfileHeader(
-                  userName: userName,
-                  employeeId: employeeId,
-                  initial: initial,
-                  profileImageUrl: profileImageUrl,
-                  kycStatus: kycStatus,
-                  kycColor: kycColor,
-                ),
+              ProfileHeader(
+                userName: userName,
+                employeeId: employeeId,
+                initial: initial,
+                profileImageUrl: profileImageUrl,
+                kycStatus: kycStatus,
+                kycColor: kycColor,
               ),
 
               // ── Content ──
               SliverPadding(
-                padding: const EdgeInsets.all(AppSizes.screenPaddingH),
+                padding: EdgeInsets.fromLTRB(
+                  MediaQuery.sizeOf(context).width < 360
+                      ? AppSizes.base
+                      : AppSizes.screenPaddingH,
+                  AppSizes.xl,
+                  MediaQuery.sizeOf(context).width < 360
+                      ? AppSizes.base
+                      : AppSizes.screenPaddingH,
+                  AppSizes.xxxl,
+                ),
                 sliver: SliverList(
                   delegate: SliverChildListDelegate([
                     // ── Stats Row ──
-                    _buildStatsRow(context, earnings, completedTasks, userRating),
+                    _buildStatsRow(context, earnings),
                     const SizedBox(height: AppSizes.md),
 
                     // ── KYC Status ──
@@ -199,56 +195,88 @@ class ProfileScreen extends StatelessWidget {
                         isVerified: kycStatus == 'Verified'),
                     const SizedBox(height: AppSizes.xxl),
 
-                    // ── Personal Info ──
-                    _buildSection(context, 'Personal Information', [
-                      _InfoRow(
+                    _ProfileCategoryGroup(
+                      title: 'Personal & Work Information',
+                      children: [
+                        _ProfileCategoryCard(
+                          embedded: true,
                           icon: LucideIcons.user,
-                          label: 'Name',
-                          value: userName),
-                      _InfoRow(
-                          icon: LucideIcons.hash,
-                          label: 'Employee ID',
-                          value: employeeId.isNotEmpty ? employeeId : 'N/A'),
-                      _InfoRow(
-                          icon: LucideIcons.phone,
-                          label: 'Phone',
-                          value: userPhone),
-                      _InfoRow(
-                          icon: LucideIcons.users,
-                          label: 'Gender',
-                          value: data['gender'] ?? 'Not set'),
-                      _InfoRow(
-                          icon: LucideIcons.calendar,
-                          label: 'DOB',
-                          value: data['dateOfBirth'] ?? 'Not set'),
-                      _InfoRow(
-                          icon: LucideIcons.mapPin,
-                          label: 'City',
-                          value: data['city'] ?? 'Not set'),
-                    ]),
-                    const SizedBox(height: AppSizes.xl),
-
-                    // ── Work Info ──
-                    _buildSection(context, 'Work Information', [
-                      _ActionRow(
-                        icon: LucideIcons.history,
-                        label: 'Task History',
-                        color: AppColors.primary,
-                        onTap: () => Navigator.pushNamed(context, AppRoutes.taskHistory),
-                      ),
-                      _InfoRow(
-                          icon: LucideIcons.languages,
-                          label: 'Language',
-                          value: data['language'] ?? 'Not set'),
-                      _InfoRow(
-                          icon: LucideIcons.graduationCap,
-                          label: 'Education',
-                          value: data['education'] ?? 'Not set'),
-                      _InfoRow(
+                          title: 'Personal Information',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProfileInformationScreen(
+                                title: 'Personal Information',
+                                icon: LucideIcons.user,
+                                items: [
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.user,
+                                      label: 'Name',
+                                      value: userName),
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.hash,
+                                      label: 'Employee ID',
+                                      value: employeeId.isNotEmpty
+                                          ? employeeId
+                                          : 'N/A'),
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.phone,
+                                      label: 'Phone',
+                                      value: userPhone),
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.users,
+                                      label: 'Gender',
+                                      value: (data['gender'] ?? 'Not set')
+                                          .toString()),
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.calendar,
+                                      label: 'DOB',
+                                      value: (data['dateOfBirth'] ?? 'Not set')
+                                          .toString()),
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.mapPin,
+                                      label: 'City',
+                                      value: (data['city'] ?? 'Not set')
+                                          .toString()),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        _ProfileCategoryCard(
+                          embedded: true,
                           icon: LucideIcons.briefcase,
-                          label: 'Experience',
-                          value: data['experience'] ?? 'Not set'),
-                    ]),
+                          title: 'Work Information',
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ProfileInformationScreen(
+                                title: 'Work Information',
+                                icon: LucideIcons.briefcase,
+                                showTaskHistory: true,
+                                items: [
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.languages,
+                                      label: 'Language',
+                                      value: (data['language'] ?? 'Not set')
+                                          .toString()),
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.graduationCap,
+                                      label: 'Education',
+                                      value: (data['education'] ?? 'Not set')
+                                          .toString()),
+                                  ProfileInformationItem(
+                                      icon: LucideIcons.briefcase,
+                                      label: 'Experience',
+                                      value: (data['experience'] ?? 'Not set')
+                                          .toString()),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: AppSizes.xl),
 
                     // ── Payment Settings ──
@@ -345,68 +373,71 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildStatsRow(BuildContext context, num earnings, num tasks, num rating) {
+  Widget _buildStatsRow(BuildContext context, num earnings) {
     final earningsEnabled =
         context.watch<PlatformSettingsService>().earningsSystemEnabled;
+    if (!earningsEnabled) return const SizedBox.shrink();
+
     final stats = <Widget>[
-      if (earningsEnabled)
-        _StatMini(
-          icon: LucideIcons.banknote,
-          label: 'Earnings',
-          value: '₹${earnings.toStringAsFixed(0)}',
-          color: AppColors.success,
-        ),
       _StatMini(
-        icon: LucideIcons.checkSquare,
-        label: 'Tasks',
-        value: tasks.toString(),
-        color: AppColors.info,
-      ),
-      _StatMini(
-        icon: LucideIcons.star,
-        label: 'Rating',
-        value: rating.toStringAsFixed(1),
-        color: AppColors.accent,
+        icon: LucideIcons.banknote,
+        label: 'Earnings',
+        value: '₹${earnings.toStringAsFixed(0)}',
+        color: AppColors.success,
       ),
     ];
 
-    return Row(
-      children: [
-        for (int i = 0; i < stats.length; i++) ...[
-          if (i > 0) const SizedBox(width: AppSizes.sm),
-          Expanded(child: stats[i]),
-        ],
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth < 340 ? 2 : stats.length;
+        final spacing = AppSizes.sm * (columns - 1);
+        final cardWidth = (constraints.maxWidth - spacing) / columns;
+
+        return Wrap(
+          spacing: AppSizes.sm,
+          runSpacing: AppSizes.sm,
+          children: [
+            for (final stat in stats)
+              SizedBox(width: cardWidth, child: stat),
+          ],
+        );
+      },
     );
   }
 
   Widget _buildKycBanner(BuildContext context, String status, Color color,
       {bool isVerified = false}) {
-    return InkWell(
+    return GestureDetector(
       onTap: isVerified
           ? null
           : () => Navigator.pushNamed(context, AppRoutes.kyc),
-      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
       child: Container(
-        padding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.lg, vertical: AppSizes.md),
+        padding: const EdgeInsets.all(AppSizes.base),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+          borderRadius: BorderRadius.circular(AppSizes.radiusXl),
           border: Border.all(color: color.withValues(alpha: 0.2)),
         ),
         child: Row(
           children: [
-            Icon(
-              status == 'Verified'
-                  ? LucideIcons.checkCircle2
-                  : status == 'Rejected'
-                      ? LucideIcons.xCircle
-                      : LucideIcons.clock,
-              size: 18,
-              color: color,
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              ),
+              child: Icon(
+                status == 'Verified'
+                    ? LucideIcons.checkCircle2
+                    : status == 'Rejected'
+                        ? LucideIcons.xCircle
+                        : LucideIcons.clock,
+                size: 19,
+                color: color,
+              ),
             ),
-            const SizedBox(width: AppSizes.sm),
+            const SizedBox(width: AppSizes.md),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -416,7 +447,7 @@ class ProfileScreen extends StatelessWidget {
                     style: TextStyle(
                       color: color,
                       fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                   if (!isVerified)
@@ -433,15 +464,22 @@ class ProfileScreen extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: AppDecorations.statusBadge(color),
-              child: Text(
-                status,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+            Flexible(
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSizes.sm,
+                  vertical: AppSizes.xs,
+                ),
+                decoration: AppDecorations.statusBadge(color),
+                child: Text(
+                  status,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
@@ -508,13 +546,26 @@ class ProfileScreen extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (title.trim().isNotEmpty) ...[
-          Text(
-            title.toUpperCase(),
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: isDark ? Colors.white38 : AppColors.textMuted,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
-            ),
+          Row(
+            children: [
+              Container(
+                width: 4,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(AppSizes.radiusRound),
+                ),
+              ),
+              const SizedBox(width: AppSizes.sm),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: isDark ? Colors.white : AppColors.textDark,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.1,
+                    ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSizes.md),
         ],
@@ -522,10 +573,153 @@ class ProfileScreen extends StatelessWidget {
           decoration: BoxDecoration(
             color: Theme.of(context).cardColor,
             borderRadius: BorderRadius.circular(AppSizes.radiusXl),
-            border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
-            boxShadow: isDark ? null : AppDecorations.shadowSm,
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : AppColors.border.withValues(alpha: 0.7),
+            ),
+            boxShadow: isDark ? null : AppDecorations.shadowMd,
           ),
           child: Column(children: dividedChildren),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProfileCategoryCard extends StatelessWidget {
+  const _ProfileCategoryCard({
+    this.embedded = false,
+    required this.icon,
+    required this.title,
+    required this.onTap,
+  });
+
+  final bool embedded;
+  final IconData icon;
+  final String title;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: embedded ? BorderRadius.zero : BorderRadius.circular(AppSizes.radiusXl),
+      child: Container(
+        padding: const EdgeInsets.all(AppSizes.base),
+        decoration: BoxDecoration(
+          color: embedded ? Colors.transparent : Theme.of(context).cardColor,
+          borderRadius:
+              embedded ? BorderRadius.zero : BorderRadius.circular(AppSizes.radiusXl),
+          border: embedded
+              ? null
+              : Border.all(
+                  color: isDark
+                      ? Colors.white.withValues(alpha: 0.08)
+                      : AppColors.border.withValues(alpha: 0.7),
+                ),
+          boxShadow: embedded || isDark ? null : AppDecorations.shadowMd,
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(AppSizes.radiusLg),
+              ),
+              child: Icon(icon, color: AppColors.primary, size: 18),
+            ),
+            const SizedBox(width: AppSizes.md),
+            Expanded(
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: isDark ? Colors.white : AppColors.textDark,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+            ),
+            const SizedBox(width: AppSizes.sm),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: isDark ? Colors.white24 : AppColors.textPlaceholder,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileCategoryGroup extends StatelessWidget {
+  const _ProfileCategoryGroup({
+    required this.title,
+    required this.children,
+  });
+
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 18,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(AppSizes.radiusRound),
+              ),
+            ),
+            const SizedBox(width: AppSizes.sm),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: isDark ? Colors.white : AppColors.textDark,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.1,
+                  ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSizes.md),
+        Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).cardColor,
+            borderRadius: BorderRadius.circular(AppSizes.radiusXl),
+            border: Border.all(
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.08)
+                  : AppColors.border.withValues(alpha: 0.7),
+            ),
+            boxShadow: isDark ? null : AppDecorations.shadowMd,
+          ),
+          child: Column(
+            children: [
+              for (var index = 0; index < children.length; index++) ...[
+                children[index],
+                if (index < children.length - 1)
+                  Divider(
+                    height: 1,
+                    indent: 68,
+                    color:
+                        Theme.of(context).dividerColor.withValues(alpha: 0.1),
+                  ),
+              ],
+            ],
+          ),
         ),
       ],
     );
@@ -551,68 +745,122 @@ class ProfileHeader extends StatelessWidget {
   final String kycStatus;
   final Color kycColor;
 
-  Future<void> _copyEmployeeId(BuildContext context) async {
-    try {
-      await Clipboard.setData(ClipboardData(text: employeeId));
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context)
-        ..hideCurrentSnackBar()
-        ..showSnackBar(const SnackBar(content: Text('Employee ID copied')));
-    } catch (_) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not copy Employee ID. Try again.')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colors = theme.colorScheme;
-    final avatarFallback = ColoredBox(
-      color: colors.primaryContainer,
+    final isDark = theme.brightness == Brightness.dark;
+    final horizontalPadding = MediaQuery.sizeOf(context).width < 360
+        ? AppSizes.base
+        : AppSizes.screenPaddingH;
+    final avatarFallback = DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: AppDecorations.primaryLightGradient,
+      ),
       child: Center(
         child: Text(initial,
           style: theme.textTheme.headlineMedium?.copyWith(
-            color: colors.onPrimaryContainer,
-            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
             letterSpacing: 0,
           ),
         ),
       ),
     );
 
-    return Material(
-      color: Color.alphaBlend(colors.primary.withValues(alpha: 0.04), theme.cardColor),
-      child: DecoratedBox(
-        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: theme.dividerColor))),
-        child: SafeArea(
-          bottom: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(AppSizes.screenPaddingH, 8, AppSizes.screenPaddingH, 24),
+    return SliverAppBar(
+      expandedHeight: 200,
+      collapsedHeight: 72,
+      pinned: true,
+      floating: false,
+      automaticallyImplyLeading: false,
+      backgroundColor:
+          isDark ? AppColors.secondary : AppColors.primaryDark,
+      surfaceTintColor: Colors.transparent,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          bottom: Radius.circular(AppSizes.radiusXxl),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      flexibleSpace: LayoutBuilder(
+        builder: (context, constraints) {
+          final settings = context
+              .dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
+          final collapseRange = settings == null
+              ? 0.0
+              : settings.maxExtent - settings.minExtent;
+          final collapseProgress = collapseRange <= 0
+              ? 0.0
+              : (1 -
+                      (settings!.currentExtent - settings.minExtent) /
+                          collapseRange)
+                  .clamp(0.0, 1.0);
+          final pinnedOpacity = Curves.easeOut.transform(
+            ((collapseProgress - 0.62) / 0.38).clamp(0.0, 1.0),
+          );
+
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              FlexibleSpaceBar(
+                collapseMode: CollapseMode.pin,
+                background: ClipRRect(
+          borderRadius: const BorderRadius.vertical(
+            bottom: Radius.circular(AppSizes.radiusXxl),
+          ),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: isDark
+                  ? AppDecorations.darkGradient
+                  : AppDecorations.primaryGradient,
+            ),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              AppSizes.sm,
+              horizontalPadding,
+              AppSizes.xxl,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     if (Navigator.canPop(context))
-                      IconButton(
-                        tooltip: 'Back',
-                        onPressed: () => Navigator.maybePop(context),
-                        icon: const Icon(LucideIcons.arrowLeft, size: 20),
-                        constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                      _HeaderIconButton(
+                        label: 'Back',
+                        icon: LucideIcons.arrowLeft,
+                        onTap: () => Navigator.maybePop(context),
                       ),
-                    Expanded(child: Text('Profile', style: theme.textTheme.titleMedium?.copyWith(letterSpacing: 0))),
-                    IconButton.filledTonal(
-                      tooltip: 'Edit profile',
-                      onPressed: () => Navigator.pushNamed(context, AppRoutes.editProfile),
-                      icon: const Icon(LucideIcons.edit3, size: 20),
-                      constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                    Expanded(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          left: Navigator.canPop(context) ? AppSizes.sm : 0,
+                        ),
+                        child: Text(
+                          'Profile',
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w800,
+                            fontSize: 24,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                      ),
+                    ),
+                    _HeaderIconButton(
+                      label: 'Edit profile',
+                      icon: LucideIcons.edit3,
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        AppRoutes.editProfile,
+                      ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: AppSizes.lg),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -620,72 +868,82 @@ class ProfileHeader extends StatelessWidget {
                       label: 'Profile photo',
                       image: true,
                       child: ExcludeSemantics(
-                        child: SizedBox.square(
-                          dimension: 72,
+                        child: Container(
+                          width: 88,
+                          height: 88,
+                          padding: const EdgeInsets.all(AppSizes.xs),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.secondary
+                                    .withValues(alpha: 0.20),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
                           child: ClipOval(
                             child: profileImageUrl.isEmpty
                                 ? avatarFallback
                                 : Image.network(
                                     profileImageUrl,
                                     fit: BoxFit.cover,
-                                    cacheWidth: (72 * MediaQuery.devicePixelRatioOf(context)).round(),
-                                    frameBuilder: (_, child, frame, loaded) => loaded || frame != null ? child : avatarFallback,
-                                    errorBuilder: (_, __, ___) => avatarFallback,
+                                    cacheWidth: (84 *
+                                            MediaQuery.devicePixelRatioOf(
+                                                context))
+                                        .round(),
+                                    frameBuilder: (_, child, frame, loaded) =>
+                                        loaded || frame != null
+                                            ? child
+                                            : avatarFallback,
+                                    errorBuilder: (_, __, ___) =>
+                                        avatarFallback,
                                   ),
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    const SizedBox(width: AppSizes.base),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(userName, style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w700, letterSpacing: 0,
-                          )),
-                          const SizedBox(height: 8),
-                          Text('Employee ID', style: theme.textTheme.labelMedium?.copyWith(
-                            color: colors.onSurfaceVariant, letterSpacing: 0,
-                          )),
+                          Text(
+                            userName,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: AppSizes.sm),
                           Row(
                             children: [
-                              Expanded(child: Text(employeeId.isEmpty ? 'Not assigned' : employeeId,
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, letterSpacing: 0),
-                              )),
-                              IconButton(
-                                tooltip: 'Copy Employee ID',
-                                onPressed: employeeId.isEmpty ? null : () => _copyEmployeeId(context),
-                                icon: const Icon(LucideIcons.copy, size: 18),
-                                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                              Text(
+                                'Employee ID :',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: Colors.white,
+                                  letterSpacing: 0,
+                                ),
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  employeeId.isEmpty ? 'Not assigned' : employeeId,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    letterSpacing: 0,
+                                  ),
+                                ),
                               ),
                             ],
-                          ),
-                          const SizedBox(height: 4),
-                          Semantics(
-                            label: 'KYC status: $kycStatus',
-                            child: ExcludeSemantics(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                decoration: BoxDecoration(
-                                  color: kycColor.withValues(alpha: 0.12),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(kycStatus == 'Verified' ? LucideIcons.shieldCheck
-                                        : kycStatus == 'Rejected' ? LucideIcons.shieldAlert : LucideIcons.clock,
-                                      size: 16, color: colors.onSurface,
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Flexible(child: Text(kycStatus, style: theme.textTheme.labelMedium?.copyWith(
-                                      color: colors.onSurface, fontWeight: FontWeight.w600, letterSpacing: 0,
-                                    ))),
-                                  ],
-                                ),
-                              ),
-                            ),
                           ),
                         ],
                       ),
@@ -694,6 +952,101 @@ class ProfileHeader extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    ),
+  ),
+              IgnorePointer(
+                ignoring: pinnedOpacity == 0,
+                child: Opacity(
+                  opacity: pinnedOpacity,
+                  child: SafeArea(
+                    bottom: false,
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: horizontalPadding,
+                      ),
+                      child: SizedBox(
+                        height: 72,
+                        child: Row(
+                          children: [
+                            if (Navigator.canPop(context)) ...[
+                              _HeaderIconButton(
+                                label: 'Back',
+                                icon: LucideIcons.arrowLeft,
+                                onTap: () => Navigator.maybePop(context),
+                              ),
+                              const SizedBox(width: AppSizes.sm),
+                            ],
+                            Expanded(
+                              child: Text(
+                                'Profile',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 24,
+                                  letterSpacing: -0.3,
+                                ),
+                              ),
+                            ),
+                            _HeaderIconButton(
+                              label: 'Edit profile',
+                              icon: LucideIcons.edit3,
+                              onTap: () => Navigator.pushNamed(
+                                context,
+                                AppRoutes.editProfile,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HeaderIconButton extends StatelessWidget {
+  const _HeaderIconButton({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.20),
+              ),
+            ),
+            child: Icon(icon, size: 19, color: Colors.white),
           ),
         ),
       ),
@@ -718,34 +1071,44 @@ class _StatMini extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      padding: const EdgeInsets.all(AppSizes.md),
+      constraints: const BoxConstraints(minHeight: 124),
+      padding: const EdgeInsets.all(AppSizes.base),
       decoration: BoxDecoration(
         color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(AppSizes.radiusLg),
-        border: Border.all(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
-        boxShadow: isDark ? null : AppDecorations.shadowSm,
+        borderRadius: BorderRadius.circular(AppSizes.radiusXl),
+        border: Border.all(
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.08)
+              : AppColors.border.withValues(alpha: 0.7),
+        ),
+        boxShadow: isDark ? null : AppDecorations.shadowMd,
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 32,
-            height: 32,
-            decoration: AppDecorations.iconBoxRound(color: color),
-            child: Icon(icon, size: 16, color: color),
+            width: 36,
+            height: 36,
+            decoration: AppDecorations.iconBox(color: color),
+            child: Icon(icon, size: 17, color: color),
           ),
           const SizedBox(height: AppSizes.sm),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w800,
               fontSize: 18,
+              letterSpacing: -0.3,
               color: isDark ? Colors.white : AppColors.textDark,
             ),
           ),
           const SizedBox(height: 2),
           Text(
             label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: isDark ? Colors.white38 : AppColors.textMuted,
               fontWeight: FontWeight.w600,
@@ -773,19 +1136,21 @@ class _InfoRow extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(
-        horizontal: AppSizes.lg,
-        vertical: AppSizes.md,
+        horizontal: AppSizes.base,
+        vertical: AppSizes.base,
       ),
       child: Row(
         children: [
           Container(
-            width: 36,
-            height: 36,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
-              color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.background,
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.06)
+                  : AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(AppSizes.radiusLg),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 16),
+            child: Icon(icon, color: AppColors.primary, size: 18),
           ),
           const SizedBox(width: AppSizes.md),
           Expanded(
@@ -803,6 +1168,8 @@ class _InfoRow extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                     color: isDark ? Colors.white : AppColors.textDark,
                     fontWeight: FontWeight.w600,
@@ -836,24 +1203,24 @@ class _ActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InkWell(
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      borderRadius: BorderRadius.circular(AppSizes.radiusMd),
       child: Padding(
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSizes.lg,
-          vertical: AppSizes.md,
+          horizontal: AppSizes.base,
+          vertical: AppSizes.base,
         ),
         child: Row(
           children: [
             Container(
-              width: 36,
-              height: 36,
+              width: 40,
+              height: 40,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+                borderRadius: BorderRadius.circular(AppSizes.radiusLg),
               ),
-              child: Icon(icon, color: color, size: 16),
+              child: Icon(icon, color: color, size: 18),
             ),
             const SizedBox(width: AppSizes.md),
             Expanded(
@@ -862,14 +1229,14 @@ class _ActionRow extends StatelessWidget {
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: isDestructive ? color : (isDark ? Colors.white : AppColors.textDark),
                   fontSize: 14,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ),
             Icon(
               LucideIcons.chevronRight, 
               size: 18, 
-              color: isDark ? Colors.white12 : AppColors.border
+              color: isDark ? Colors.white24 : AppColors.textPlaceholder
             ),
           ],
         ),
