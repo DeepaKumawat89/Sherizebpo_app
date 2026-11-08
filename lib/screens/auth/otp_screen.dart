@@ -14,7 +14,16 @@ import '../../widgets/custom_button.dart';
 /// OTP verification screen with 6-digit input, countdown timer,
 /// resend functionality, and navigation to Dashboard on success.
 class OtpScreen extends StatefulWidget {
-  const OtpScreen({Key? key}) : super(key: key);
+  const OtpScreen({
+    Key? key,
+    this.phone,
+    this.verificationId,
+    this.embedded = false,
+  }) : super(key: key);
+
+  final String? phone;
+  final String? verificationId;
+  final bool embedded;
 
   @override
   State<OtpScreen> createState() => _OtpScreenState();
@@ -146,7 +155,7 @@ class _OtpScreenState extends State<OtpScreen> {
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     final verificationId =
-      _verificationId ?? args?['verificationId'] as String?;
+      _verificationId ?? widget.verificationId ?? args?['verificationId'] as String?;
 
     final authService = Provider.of<AuthService>(context, listen: false);
     final errorMsg = await authService.verifyOtp(
@@ -175,7 +184,7 @@ class _OtpScreenState extends State<OtpScreen> {
     if (!_canResend || _isLoading || _isResending) return;
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final phone = args?['phone'] as String?;
+    final phone = widget.phone ?? args?['phone'] as String?;
     if (phone == null || phone.isEmpty) {
       setState(() => _errorText = 'Go back and enter your phone number again.');
       return;
@@ -233,19 +242,24 @@ class _OtpScreenState extends State<OtpScreen> {
     // Read phone from route arguments (passed from LoginScreen)
     final args =
         ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    final phone =
-        args?['phone'] as String? ?? '${AppConstants.countryCode} XXXXX XXXXX';
+    final phone = widget.phone ??
+        args?['phone'] as String? ??
+        '${AppConstants.countryCode} XXXXX XXXXX';
 
     return PopScope(
-      canPop: false,
+      canPop: widget.embedded,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        if (widget.embedded) {
+          Navigator.of(context).pop();
+          return;
+        }
         Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false);
       },
       child: Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: widget.embedded ? Colors.white : AppColors.background,
         appBar: AppBar(
-          backgroundColor: AppColors.background,
+          backgroundColor: widget.embedded ? Colors.white : AppColors.background,
           elevation: 0,
           scrolledUnderElevation: 0,
           leading: IconButton(
@@ -253,7 +267,7 @@ class _OtpScreenState extends State<OtpScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.background,
+                color: widget.embedded ? Colors.white : AppColors.background,
                 borderRadius: BorderRadius.circular(AppSizes.radiusMd),
               ),
               child: const Icon(
@@ -262,7 +276,10 @@ class _OtpScreenState extends State<OtpScreen> {
                 color: AppColors.textDark,
               ),
             ),
-            onPressed: () => Navigator.pushNamedAndRemoveUntil(context, AppRoutes.login, (_) => false),
+            onPressed: widget.embedded
+                ? () => Navigator.of(context).pop()
+                : () => Navigator.pushNamedAndRemoveUntil(
+                    context, AppRoutes.login, (_) => false),
           ),
           title: const Text(
             'Verify OTP',

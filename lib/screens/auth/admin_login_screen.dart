@@ -166,10 +166,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
           Positioned.fill(
             child: Column(
               children: [
-                Expanded(
+                const Expanded(
                   flex: 34,
                   child: DecoratedBox(
-                    decoration: const BoxDecoration(color: _headerIndigo),
+                    decoration: BoxDecoration(color: _headerIndigo),
                   ),
                 ),
                 Expanded(
@@ -320,10 +320,10 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                                   style: inputTextStyle,
                                   decoration: InputDecoration(
                                     hintText: '••••••••',
-                                    hintStyle: TextStyle(
+                                    hintStyle: const TextStyle(
                                       color: AppColors.textPlaceholder,
                                     ),
-                                    prefixIcon: Icon(
+                                    prefixIcon: const Icon(
                                       LucideIcons.lock,
                                       size: 19,
                                       color: AppColors.primary,
@@ -348,14 +348,14 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(
                                           AppSizes.radiusLg),
-                                      borderSide: BorderSide(
+                                      borderSide: const BorderSide(
                                         color: inputBorderColor,
                                       ),
                                     ),
                                     enabledBorder: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(
                                           AppSizes.radiusLg),
-                                      borderSide: BorderSide(
+                                      borderSide: const BorderSide(
                                         color: inputBorderColor,
                                       ),
                                     ),
@@ -443,12 +443,12 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
                                       AppRoutes.login,
                                     );
                                   },
-                            icon: Icon(
+                            icon: const Icon(
                               LucideIcons.arrowLeft,
                               size: 16,
                               color: AppColors.textMuted,
                             ),
-                            label: Text(
+                            label: const Text(
                               'Back to Login',
                               style: TextStyle(
                                 color: AppColors.textMuted,

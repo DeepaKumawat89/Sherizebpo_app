@@ -184,12 +184,12 @@ class _DashboardScreenState extends State<DashboardScreen>
                                         fontSize: 13,
                                       ),
                                     ),
-                                  ],
+                                    ],
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
 
                       // ── Earnings Card ──
                       if (settings.earningsSystemEnabled) ...[

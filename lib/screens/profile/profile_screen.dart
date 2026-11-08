@@ -408,9 +408,7 @@ class ProfileScreen extends StatelessWidget {
   Widget _buildKycBanner(BuildContext context, String status, Color color,
       {bool isVerified = false}) {
     return GestureDetector(
-      onTap: isVerified
-          ? null
-          : () => Navigator.pushNamed(context, AppRoutes.kyc),
+      onTap: () => Navigator.pushNamed(context, AppRoutes.kyc),
       child: Container(
         padding: const EdgeInsets.all(AppSizes.base),
         decoration: BoxDecoration(
@@ -443,50 +441,37 @@ class ProfileScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'KYC Status',
+                    status == 'Verified'
+                        ? 'KYC Verified'
+                        : status == 'Rejected'
+                            ? 'KYC Rejected'
+                            : 'KYC Pending',
                     style: TextStyle(
                       color: color,
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  if (!isVerified)
-                    Text(
-                      status == 'Rejected'
-                          ? 'Resubmit your documents to get verified'
-                          : 'Complete verification to unlock payouts',
-                      style: TextStyle(
-                        color: color.withValues(alpha: 0.8),
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                      ),
+                  const SizedBox(height: AppSizes.xs),
+                  Text(
+                    isVerified
+                        ? 'Your identity has been verified'
+                        : status == 'Rejected'
+                            ? 'Resubmit your documents to get verified'
+                            : 'Complete verification to unlock payouts',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: color.withValues(alpha: 0.8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
                     ),
+                  ),
                 ],
               ),
             ),
-            Flexible(
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSizes.sm,
-                  vertical: AppSizes.xs,
-                ),
-                decoration: AppDecorations.statusBadge(color),
-                child: Text(
-                  status,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ),
-            if (!isVerified) ...[
-              const SizedBox(width: AppSizes.sm),
-              Icon(LucideIcons.chevronRight, size: 16, color: color),
-            ],
+            const SizedBox(width: AppSizes.sm),
+            Icon(LucideIcons.chevronRight, size: 16, color: color),
           ],
         ),
       ),
@@ -757,10 +742,12 @@ class ProfileHeader extends StatelessWidget {
         gradient: AppDecorations.primaryLightGradient,
       ),
       child: Center(
-        child: Text(initial,
+        child: Text(
+          initial,
           style: theme.textTheme.headlineMedium?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w800,
+            fontSize: 14,
             letterSpacing: 0,
           ),
         ),
@@ -869,12 +856,13 @@ class ProfileHeader extends StatelessWidget {
                       image: true,
                       child: ExcludeSemantics(
                         child: Container(
-                          width: 88,
-                          height: 88,
-                          padding: const EdgeInsets.all(AppSizes.xs),
+                          width: 80,
+                          height: 90,
+                          padding: const EdgeInsets.all(3),
                           decoration: BoxDecoration(
                             color: Colors.white,
-                            shape: BoxShape.circle,
+                            borderRadius:
+                                BorderRadius.circular(AppSizes.radiusSm),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.secondary
@@ -884,13 +872,15 @@ class ProfileHeader extends StatelessWidget {
                               ),
                             ],
                           ),
-                          child: ClipOval(
+                          child: ClipRRect(
+                            borderRadius:
+                                BorderRadius.circular(AppSizes.radiusSm),
                             child: profileImageUrl.isEmpty
                                 ? avatarFallback
                                 : Image.network(
                                     profileImageUrl,
                                     fit: BoxFit.cover,
-                                    cacheWidth: (84 *
+                                    cacheWidth: (48 *
                                             MediaQuery.devicePixelRatioOf(
                                                 context))
                                         .round(),

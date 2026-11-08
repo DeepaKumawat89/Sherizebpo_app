@@ -457,9 +457,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         centerTitle: false,
         titleTextStyle: Theme.of(context).textTheme.titleLarge?.copyWith(
           color: AppColors.textDark,
-          fontSize: 24,
-          fontWeight: FontWeight.w800,
-          letterSpacing: -0.5,
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          letterSpacing: 0,
         ),
         iconTheme: const IconThemeData(color: AppColors.textDark),
       ),

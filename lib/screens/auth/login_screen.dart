@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -6,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/constants.dart';
 import '../../services/auth_service.dart';
 import '../../routes.dart';
+import 'otp_screen.dart';
 import '../../widgets/developer_credit.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -37,8 +37,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _loading = false;
   String? _error;
-  Timer? _cooldownTimer;
-  int _cooldownSeconds = 0;
 
   @override
   void initState() {
@@ -48,7 +46,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _cooldownTimer?.cancel();
     _emailCtrl.dispose();
     _employeeIdCtrl.dispose();
     _passwordCtrl.dispose();
@@ -66,19 +63,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _useEmployeeId = employee;
       _obscurePassword = true;
       _error = null;
-    });
-  }
-
-  void _startCooldown() {
-    _cooldownTimer?.cancel();
-    setState(() => _cooldownSeconds = 30);
-    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (!mounted) {
-        timer.cancel();
-        return;
-      }
-      setState(() => _cooldownSeconds--);
-      if (_cooldownSeconds == 0) timer.cancel();
     });
   }
 
@@ -114,9 +98,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _sendOtp() async {
-    if (_loading ||
-        _cooldownSeconds > 0 ||
-        !_formKey.currentState!.validate()) {
+    if (_loading || !_formKey.currentState!.validate()) {
       return;
     }
     final phone = '+91${_phoneCtrl.text.trim()}';
@@ -125,7 +107,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
       _loading = true;
     });
-    _startCooldown();
     try {
       await context.read<AuthService>().sendOtp(
         phone,
@@ -141,10 +122,25 @@ class _LoginScreenState extends State<LoginScreen> {
             return;
           }
           setState(() => _loading = false);
-          Navigator.pushNamed(context, AppRoutes.otp, arguments: {
-            'phone': phone,
-            'verificationId': verificationId,
-          });
+          showModalBottomSheet<void>(
+            context: context,
+            isScrollControlled: true,
+            backgroundColor: Colors.transparent,
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.vertical(
+                top: Radius.circular(AppSizes.radiusXxl),
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            builder: (_) => FractionallySizedBox(
+              heightFactor: 0.9,
+              child: OtpScreen(
+                phone: phone,
+                verificationId: verificationId,
+                embedded: true,
+              ),
+            ),
+          );
         },
         onError: (error) {
           if (!mounted || !_mobileLogin) return;
@@ -314,11 +310,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 height: AppSizes.buttonHeightLg,
                 padding: const EdgeInsets.fromLTRB(24, 6, 6, 6),
                 decoration: BoxDecoration(
-                  color: _loading || (_mobileLogin && _cooldownSeconds > 0)
+                  color: _loading
                       ? Colors.indigo.shade500.withValues(alpha: 0.60)
                       : Colors.indigo.shade500,
                   borderRadius: BorderRadius.circular(100), // full pill
-                  boxShadow: _loading || (_mobileLogin && _cooldownSeconds > 0)
+                  boxShadow: _loading
                       ? null
                       : [
                           BoxShadow(
@@ -331,7 +327,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
-                  onTap: _loading || (_mobileLogin && _cooldownSeconds > 0)
+                  onTap: _loading
                       ? null
                       : _mobileLogin
                           ? _sendOtp
@@ -351,11 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                 )
                               : Text(
-                                  _mobileLogin
-                                      ? _cooldownSeconds > 0
-                                          ? 'Resend in ${_cooldownSeconds}s'
-                                          : 'Send OTP'
-                                      : 'Sign in',
+                                  _mobileLogin ? 'Send OTP' : 'Sign in',
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 16,
@@ -371,8 +363,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             shape: BoxShape.circle,
                             color:  Colors.white // soft purple circle
                                 .withValues(
-                              alpha: _loading ||
-                                      (_mobileLogin && _cooldownSeconds > 0)
+                              alpha: _loading
                                   ? 0.60
                                   : 1.0,
                             ),
@@ -429,7 +420,9 @@ class _LoginScreenState extends State<LoginScreen> {
             builder: (context, constraints) {
               final isCompact = constraints.maxWidth < 360;
               final headerHeight = isCompact ? 240.0 : 280.0;
-              final logoSize = isCompact ? 196.0 : 228.0;
+              final logoSize = _mobileLogin
+                  ? (isCompact ? 224.0 : 260.0)
+                  : (isCompact ? 196.0 : 228.0);
 
               return Column(
                 children: [
@@ -448,22 +441,23 @@ class _LoginScreenState extends State<LoginScreen> {
                           fit: BoxFit.contain,
                           semanticLabel: 'Sherize',
                         ),
-                        Transform.translate(
-                          offset: const Offset(0, -50),
-                          child: Text(
-                            _mobileLogin ? 'Mobile login' : 'Welcome back',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context)
-                                .textTheme
-                                .headlineSmall
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: Colors.white,
-                                  fontSize: isCompact ? 24 : 27,
-                                  letterSpacing: -0.5,
-                                ),
+                        if (!_mobileLogin)
+                          Transform.translate(
+                            offset: const Offset(0, -50),
+                            child: Text(
+                              'Welcome back',
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    color: Colors.white,
+                                    fontSize: isCompact ? 24 : 27,
+                                    letterSpacing: -0.5,
+                                  ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -496,6 +490,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
+                                if (_mobileLogin) ...[
+                                  const Text(
+                                    'Mobile Login',
+                                    style: TextStyle(
+                                      color: AppColors.textDark,
+                                      fontSize: 24,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 24),
+                                ],
                                 if (!_mobileLogin) ...[
                                   SegmentedButton<bool>(
                                     segments: const [
@@ -540,6 +545,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   const SizedBox(height: 24),
                                 ],
                                 _buildForm(),
+                                if (_mobileLogin) const SizedBox(height: 24),
                                 const SizedBox(height: 12),
                                 OutlinedButton.icon(
                                   onPressed: _loading
