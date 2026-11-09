@@ -1,4 +1,4 @@
-storePassword=REPLACE_WITH_UPLOAD_KEYSTORE_PASSWORD
-keyPassword=REPLACE_WITH_UPLOAD_KEY_PASSWORD
+storePassword=Deepak@8956@
+keyPassword=Deepak@8956@
 keyAlias=upload
-storeFile=upload-keystore.jks
+storeFile=upload-keystore.jks   

@@ -3,33 +3,33 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
-
+ 
 import '../../core/constants/constants.dart';
 import '../../services/mail_service.dart';
 import '../inbox/mail_thread_screen.dart';
-
+ 
 /// Support/admin mail console — the shared queue of worker ⇄ support threads.
 class AdminMailScreen extends StatefulWidget {
   const AdminMailScreen({Key? key}) : super(key: key);
-
+ 
   @override
   State<AdminMailScreen> createState() => _AdminMailScreenState();
 }
-
+ 
 class _AdminMailScreenState extends State<AdminMailScreen> {
   final MailService _mail = MailService();
   final user = FirebaseAuth.instance.currentUser;
-
+ 
   String _name = 'Admin';
   String _role = 'admin';
   bool _loaded = false;
-
+ 
   @override
   void initState() {
     super.initState();
     _loadIdentity();
   }
-
+ 
   Future<void> _loadIdentity() async {
     if (user == null) return;
     try {
@@ -46,7 +46,7 @@ class _AdminMailScreenState extends State<AdminMailScreen> {
       if (mounted) setState(() => _loaded = true);
     }
   }
-
+ 
   @override
   Widget build(BuildContext context) {
     if (user == null) {
@@ -55,7 +55,7 @@ class _AdminMailScreenState extends State<AdminMailScreen> {
     if (!_loaded) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
-
+ 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -71,28 +71,61 @@ class _AdminMailScreenState extends State<AdminMailScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSizes.xl),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 64,
+                      height: 64,
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(LucideIcons.alertCircle,
+                          size: 30, color: AppColors.error),
+                    ),
+                    const SizedBox(height: AppSizes.md),
+                    Text(
+                      'Error: ${snapshot.error}',
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          color: AppColors.textMuted, fontSize: 13, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
           final docs = snapshot.data?.docs ?? [];
           if (docs.isEmpty) {
             return _empty('No employee mail yet.');
           }
-          return ListView.separated(
-            padding: const EdgeInsets.all(AppSizes.md),
-            itemCount: docs.length,
-            separatorBuilder: (_, __) => const SizedBox(height: AppSizes.sm),
-            itemBuilder: (context, index) {
-              final doc = docs[index];
-              final data = doc.data();
-              final who = (data['createdByName'] ?? 'Employee').toString();
-              return _threadTile(doc.id, data, subtitlePrefix: who);
-            },
+          return Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 720),
+              child: ListView.separated(
+                padding: const EdgeInsets.all(AppSizes.md),
+                itemCount: docs.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(height: AppSizes.sm),
+                itemBuilder: (context, index) {
+                  final doc = docs[index];
+                  final data = doc.data();
+                  final who = (data['createdByName'] ?? 'Employee').toString();
+                  return _threadTile(doc.id, data, subtitlePrefix: who);
+                },
+              ),
+            ),
           );
         },
       ),
     );
   }
-
+ 
   Widget _threadTile(String id, Map<String, dynamic> data,
       {required String subtitlePrefix}) {
     final subject = (data['subject'] ?? 'No subject').toString();
@@ -101,49 +134,12 @@ class _AdminMailScreenState extends State<AdminMailScreen> {
     final ts = data['lastMessageAt'];
     final when = ts is Timestamp ? _relative(ts.toDate()) : '';
     final unread = MailService.isUnreadFor(user!.uid, data);
-
-    return Card(
-      margin: EdgeInsets.zero,
-      child: ListTile(
-        contentPadding: const EdgeInsets.symmetric(
-            horizontal: AppSizes.lg, vertical: AppSizes.xs),
-        leading: CircleAvatar(
-          backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-          child: const Icon(LucideIcons.mail, color: AppColors.primary, size: 20),
-        ),
-        title: Text(
-          subject,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-              fontWeight: unread ? FontWeight.w800 : FontWeight.w700),
-        ),
-        subtitle: Text(
-          '$subtitlePrefix · $last',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: AppColors.textMuted),
-        ),
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(when,
-                style:
-                    const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-            const SizedBox(height: 6),
-            if (unread)
-              Container(
-                width: 10,
-                height: 10,
-                decoration: const BoxDecoration(
-                    color: AppColors.primary, shape: BoxShape.circle),
-              )
-            else if (status == 'closed')
-              const Icon(LucideIcons.checkCircle2,
-                  size: 14, color: AppColors.success),
-          ],
-        ),
+ 
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
@@ -157,28 +153,115 @@ class _AdminMailScreenState extends State<AdminMailScreen> {
             ),
           ),
         ),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.md, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: unread ? AppColors.primary : AppColors.border,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(LucideIcons.mail,
+                    color: AppColors.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight:
+                              unread ? FontWeight.w800 : FontWeight.w700),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '$subtitlePrefix · $last',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          color: AppColors.textMuted, fontSize: 13),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(when,
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.textMuted)),
+                  const SizedBox(height: 8),
+                  if (unread)
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                          color: AppColors.primary, shape: BoxShape.circle),
+                    )
+                  else if (status == 'closed')
+                    const Icon(LucideIcons.checkCircle2,
+                        size: 16, color: AppColors.success)
+                  else
+                    const SizedBox(height: 10),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
-
+ 
   Widget _empty(String message) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(AppSizes.xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(LucideIcons.mail, size: 48, color: AppColors.textMuted),
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Icon(LucideIcons.mail,
+                  size: 38, color: AppColors.textMuted),
+            ),
             const SizedBox(height: AppSizes.md),
             Text(message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppColors.textMuted, height: 1.4)),
+                style: const TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4)),
           ],
         ),
       ),
     );
   }
-
+ 
   static String _relative(DateTime d) {
     final mins = DateTime.now().difference(d).inMinutes;
     if (mins < 1) return 'now';

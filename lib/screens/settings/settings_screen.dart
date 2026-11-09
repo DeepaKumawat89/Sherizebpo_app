@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+ 
 import '../../core/constants/constants.dart';
 import '../../core/utils/snackbar_utils.dart';
 import '../../routes.dart';
@@ -11,14 +11,14 @@ import '../../services/auth_service.dart';
 import '../../services/security_service.dart';
 import '../../widgets/developer_credit.dart';
 import 'passcode_screen.dart';
-
+ 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
-
+ 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
-
+ 
 class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _openPlayStore() async {
     final uri = Uri.parse(AppConstants.playStoreUrl);
@@ -26,7 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       SnackBarUtils.showError('Could not open the app store');
     }
   }
-
+ 
   Future<void> _requestAccountDeletion() async {
     final uri = Uri(
       scheme: 'mailto',
@@ -45,7 +45,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'Could not open email. Contact ${AppConstants.supportEmail}.');
     }
   }
-
+ 
   Future<void> _handleLogout(BuildContext context) async {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final bool? confirm = await showDialog<bool>(
@@ -72,7 +72,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
-
+ 
     if (confirm == true && context.mounted) {
       final auth = Provider.of<AuthService>(context, listen: false);
       await auth.logout();
@@ -82,12 +82,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     }
   }
-
-
+ 
+ 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
+ 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -105,285 +105,368 @@ class _SettingsScreenState extends State<SettingsScreen> {
         iconTheme: IconThemeData(color: isDark ? Colors.white : AppColors.textDark),
       ),
       body: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.symmetric(
           horizontal: AppSizes.screenPaddingH,
           vertical: AppSizes.screenPaddingV,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _sectionLabel(context, 'Account'),
-            const SizedBox(height: AppSizes.sm),
-            _card(context, [
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.user,
-                title: 'Edit Profile',
-                onTap: () => Navigator.pushNamed(context, AppRoutes.editProfile),
-              ),
-              Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-              Consumer<AuthService>(
-                builder: (context, auth, _) {
-                  return _buildListTile(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _sectionLabel(context, 'Account'),
+                const SizedBox(height: AppSizes.sm),
+                _card(context, [
+                  _buildListTile(
                     context: context,
-                    icon: LucideIcons.fingerprint,
-                    title: 'Employee ID',
-                    subtitle: auth.workerId ?? 'Not Assigned',
-                    onTap: () {
-                      if (auth.workerId != null) {
-                        Clipboard.setData(ClipboardData(text: auth.workerId!));
-                        SnackBarUtils.showInfo('Employee ID copied to clipboard');
-                      }
-                    },
-                  );
-                },
-              ),
-              Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.landmark,
-                title: 'Bank / UPI Details',
-                onTap: () => Navigator.pushNamed(context, AppRoutes.bankDetails),
-              ),
-            ]),
-            const SizedBox(height: AppSizes.xxl),
-
-            _sectionLabel(context, 'Preferences'),
-            const SizedBox(height: AppSizes.sm),
-            _card(context, [
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.bell,
-                title: 'Notifications',
-                onTap: () => Navigator.pushNamed(context, AppRoutes.notifications),
-              ),
-            ]),
-            const SizedBox(height: AppSizes.xxl),
-
-            _sectionLabel(context, 'Security'),
-            const SizedBox(height: AppSizes.sm),
-            Consumer<SecurityService>(
-              builder: (context, security, _) {
-                return _card(context, [
-                  SwitchListTile(
-                    activeThumbColor: AppColors.primary,
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: AppSizes.lg, vertical: AppSizes.xs),
-                    secondary: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.surfaceVariant,
-                        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                      ),
-                      child: Icon(LucideIcons.lock,
-                          color: isDark ? Colors.white70 : AppColors.textDark,
-                          size: 20),
-                    ),
-                    title: Text('App Lock',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 16,
-                          color: isDark ? Colors.white : AppColors.textDark,
-                        )),
-                    subtitle: Text(
-                      security.isPasscodeEnabled ? 'Passcode enabled' : 'Passcode disabled',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: isDark ? Colors.white38 : AppColors.textMuted,
-                      ),
-                    ),
-                    value: security.isPasscodeEnabled,
-                    onChanged: (value) {
-                      if (value) {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PasscodeScreen(mode: PasscodeMode.setup)),
-                        );
-                      } else {
-                        security.clearPasscode();
-                      }
+                    icon: LucideIcons.user,
+                    title: 'Edit Profile',
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.editProfile),
+                  ),
+                  _divider(isDark),
+                  Consumer<AuthService>(
+                    builder: (context, auth, _) {
+                      return _buildListTile(
+                        context: context,
+                        icon: LucideIcons.fingerprint,
+                        title: 'Employee ID',
+                        subtitle: auth.workerId ?? 'Not Assigned',
+                        trailingIcon: LucideIcons.copy,
+                        onTap: () {
+                          if (auth.workerId != null) {
+                            Clipboard.setData(
+                                ClipboardData(text: auth.workerId!));
+                            SnackBarUtils.showInfo(
+                                'Employee ID copied to clipboard');
+                          }
+                        },
+                      );
                     },
                   ),
-                  if (security.isPasscodeEnabled) ...[
-                    Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-                    _buildListTile(
-                      context: context,
-                      icon: LucideIcons.key,
-                      title: 'Change Passcode',
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(builder: (_) => const PasscodeScreen(mode: PasscodeMode.enterCurrentToChange)),
-                        );
-                      },
-                    ),
-                    Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-                    SwitchListTile(
-                      activeThumbColor: AppColors.primary,
+                  _divider(isDark),
+                  _buildListTile(
+                    context: context,
+                    icon: LucideIcons.landmark,
+                    title: 'Bank / UPI Details',
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.bankDetails),
+                  ),
+                ]),
+                const SizedBox(height: AppSizes.xxl),
+ 
+                _sectionLabel(context, 'Preferences'),
+                const SizedBox(height: AppSizes.sm),
+                _card(context, [
+                  _buildListTile(
+                    context: context,
+                    icon: LucideIcons.bell,
+                    title: 'Notifications',
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.notifications),
+                  ),
+                ]),
+                const SizedBox(height: AppSizes.xxl),
+ 
+                _sectionLabel(context, 'Security'),
+                const SizedBox(height: AppSizes.sm),
+                Consumer<SecurityService>(
+                  builder: (context, security, _) {
+                    return _card(context, [
+                      SwitchListTile(
+                        activeThumbColor: AppColors.primary,
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: AppSizes.lg, vertical: AppSizes.xs),
+                        secondary: _iconTile(
+                          isDark: isDark,
+                          child: Icon(LucideIcons.lock,
+                              color: isDark
+                                  ? Colors.white70
+                                  : AppColors.textDark,
+                              size: 20),
+                        ),
+                        title: Text('App Lock',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 16,
+                              color:
+                                  isDark ? Colors.white : AppColors.textDark,
+                            )),
+                        subtitle: Text(
+                          security.isPasscodeEnabled
+                              ? 'Passcode enabled'
+                              : 'Passcode disabled',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color:
+                                isDark ? Colors.white38 : AppColors.textMuted,
+                          ),
+                        ),
+                        value: security.isPasscodeEnabled,
+                        onChanged: (value) {
+                          if (value) {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const PasscodeScreen(
+                                      mode: PasscodeMode.setup)),
+                            );
+                          } else {
+                            security.clearPasscode();
+                          }
+                        },
+                      ),
+                      if (security.isPasscodeEnabled) ...[
+                        _divider(isDark),
+                        _buildListTile(
+                          context: context,
+                          icon: LucideIcons.key,
+                          title: 'Change Passcode',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const PasscodeScreen(
+                                      mode: PasscodeMode.enterCurrentToChange)),
+                            );
+                          },
+                        ),
+                        _divider(isDark),
+                        SwitchListTile(
+                          activeThumbColor: AppColors.primary,
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: AppSizes.lg, vertical: AppSizes.xs),
+                          secondary: _iconTile(
+                            isDark: isDark,
+                            child: Icon(Icons.fingerprint,
+                                color: isDark
+                                    ? Colors.white70
+                                    : AppColors.textDark,
+                                size: 20),
+                          ),
+                          title: Text('Unlock with Biometrics',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                                color: isDark
+                                    ? Colors.white
+                                    : AppColors.textDark,
+                              )),
+                          value: security.isBiometricsEnabled,
+                          onChanged: security.isAuthenticating
+                              ? null
+                              : (value) async {
+                                  final changed = await security
+                                      .setBiometricsEnabled(value);
+                                  if (!changed && context.mounted) {
+                                    SnackBarUtils.showError(
+                                        security.biometricError ??
+                                            'Unable to enable biometrics. Try again.');
+                                  }
+                                },
+                        ),
+                      ],
+                    ]);
+                  },
+                ),
+                const SizedBox(height: AppSizes.xxl),
+ 
+                _sectionLabel(context, 'Support & About'),
+                const SizedBox(height: AppSizes.sm),
+                _card(context, [
+                  _buildListTile(
+                    context: context,
+                    icon: LucideIcons.helpCircle,
+                    title: 'Help Center',
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.help),
+                  ),
+                  _divider(isDark),
+                  _buildListTile(
+                    context: context,
+                    icon: LucideIcons.messageSquare,
+                    title: 'FAQs',
+                    onTap: () => Navigator.pushNamed(context, AppRoutes.help),
+                  ),
+                  _divider(isDark),
+                  _buildListTile(
+                    context: context,
+                    icon: LucideIcons.star,
+                    title: 'Rate the App',
+                    onTap: _openPlayStore,
+                  ),
+                  _divider(isDark),
+                  _buildListTile(
+                    context: context,
+                    icon: LucideIcons.shield,
+                    title: 'Privacy Policy',
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.privacyPolicy),
+                  ),
+                  _divider(isDark),
+                  _buildListTile(
+                    context: context,
+                    icon: LucideIcons.fileText,
+                    title: 'Terms of Service',
+                    onTap: () =>
+                        Navigator.pushNamed(context, AppRoutes.termsOfService),
+                  ),
+                  _divider(isDark),
+                  _buildListTile(
+                    context: context,
+                    icon: LucideIcons.userX,
+                    title: 'Request Account Deletion',
+                    subtitle: 'Delete your account and associated personal data',
+                    iconColor: AppColors.error,
+                    iconBackgroundColor: AppColors.error.withValues(alpha: 0.1),
+                    onTap: _requestAccountDeletion,
+                  ),
+                ]),
+                const SizedBox(height: AppSizes.xxxl),
+ 
+                _card(
+                  context,
+                  [
+                    ListTile(
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: AppSizes.lg, vertical: AppSizes.xs),
-                      secondary: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.surfaceVariant,
-                          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                        ),
-                        child: Icon(Icons.fingerprint,
-                            color: isDark ? Colors.white70 : AppColors.textDark,
-                            size: 20),
+                      leading: _iconTile(
+                        isDark: isDark,
+                        background: AppColors.error.withValues(alpha: 0.1),
+                        child: const Icon(LucideIcons.logOut,
+                            color: AppColors.error, size: 20),
                       ),
-                      title: Text('Unlock with Biometrics',
-                          style: TextStyle(
+                      title: const Text(
+                        'Logout',
+                        style: TextStyle(
+                            color: AppColors.error,
                             fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            color: isDark ? Colors.white : AppColors.textDark,
-                          )),
-                      value: security.isBiometricsEnabled,
-                      onChanged: security.isAuthenticating ? null : (value) async {
-                        final changed = await security.setBiometricsEnabled(value);
-                        if (!changed && context.mounted) {
-                          SnackBarUtils.showError(security.biometricError ?? 'Unable to enable biometrics. Try again.');
-                        }
-                      },
+                            fontSize: 16),
+                      ),
+                      onTap: () => _handleLogout(context),
                     ),
                   ],
-                ]);
-              },
-            ),
-            const SizedBox(height: AppSizes.xxl),
-
-            _sectionLabel(context, 'Support & About'),
-            const SizedBox(height: AppSizes.sm),
-            _card(context, [
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.helpCircle,
-                title: 'Help Center',
-                onTap: () => Navigator.pushNamed(context, AppRoutes.help),
-              ),
-              Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.messageSquare,
-                title: 'FAQs',
-                onTap: () => Navigator.pushNamed(context, AppRoutes.help),
-              ),
-              Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.star,
-                title: 'Rate the App',
-                onTap: _openPlayStore,
-              ),
-              Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.shield,
-                title: 'Privacy Policy',
-                onTap: () => Navigator.pushNamed(context, AppRoutes.privacyPolicy),
-              ),
-              Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.fileText,
-                title: 'Terms of Service',
-                onTap: () => Navigator.pushNamed(context, AppRoutes.termsOfService),
-              ),
-              Divider(height: 1, color: isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.border.withValues(alpha: 0.5)),
-              _buildListTile(
-                context: context,
-                icon: LucideIcons.userX,
-                title: 'Request Account Deletion',
-                subtitle: 'Delete your account and associated personal data',
-                iconColor: AppColors.error,
-                iconBackgroundColor: AppColors.error.withValues(alpha: 0.1),
-                onTap: _requestAccountDeletion,
-              ),
-            ]),
-            const SizedBox(height: AppSizes.xxxl),
-
-            _card(context, [
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: AppSizes.lg, vertical: AppSizes.xs),
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-                  ),
-                  child: const Icon(LucideIcons.logOut,
-                      color: AppColors.error, size: 20),
+                  borderColor: AppColors.error.withValues(alpha: 0.25),
                 ),
-                title: const Text(
-                  'Logout',
-                  style: TextStyle(
-                      color: AppColors.error,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 16),
+ 
+                const SizedBox(height: AppSizes.xl),
+                Center(
+                  child: Column(
+                    children: [
+                      Text(
+                        AppConstants.appName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isDark ? Colors.white38 : AppColors.textMuted,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Version ${AppConstants.appVersion}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: isDark ? Colors.white24 : AppColors.textLight,
+                        ),
+                      ),
+                      const SizedBox(height: AppSizes.md),
+                      DeveloperCredit(
+                        color: isDark ? Colors.white38 : AppColors.textMuted,
+                      ),
+                    ],
+                  ),
                 ),
-                onTap: () => _handleLogout(context),
-              ),
-            ]),
-
-            const SizedBox(height: AppSizes.xl),
-            Center(
-              child: Column(
-                children: [
-                  Text(
-                    AppConstants.appName,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: isDark ? Colors.white38 : AppColors.textMuted,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    'Version ${AppConstants.appVersion}',
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      color: isDark ? Colors.white24 : AppColors.textLight,
-                    ),
-                  ),
-                  const SizedBox(height: AppSizes.md),
-                  DeveloperCredit(
-                    color: isDark ? Colors.white38 : AppColors.textMuted,
-                  ),
-                ],
-              ),
+ 
+                const SizedBox(height: AppSizes.xxl),
+              ],
             ),
-
-            const SizedBox(height: AppSizes.xxl),
-          ],
+          ),
         ),
       ),
     );
   }
-
+ 
   Widget _sectionLabel(BuildContext context, String text) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Text(
-      text,
-      style: TextStyle(
-          color: isDark ? Colors.white38 : AppColors.textLabel,
-          fontSize: 13,
-          fontWeight: FontWeight.w600),
+    return Padding(
+      padding: const EdgeInsets.only(left: AppSizes.xs),
+      child: Text(
+        text,
+        style: TextStyle(
+            color: isDark ? Colors.white54 : AppColors.textLabel,
+            fontSize: 13.5,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.1),
+      ),
     );
   }
-
-  Widget _card(BuildContext context, List<Widget> children) {
+ 
+  Widget _divider(bool isDark) {
+    return Divider(
+      height: 1,
+      indent: AppSizes.lg + 40 + AppSizes.base,
+      endIndent: AppSizes.lg,
+      color: isDark
+          ? Colors.white.withValues(alpha: 0.06)
+          : AppColors.border.withValues(alpha: 0.5),
+    );
+  }
+ 
+  Widget _iconTile({
+    required bool isDark,
+    required Widget child,
+    Color? background,
+  }) {
+    return Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: background ??
+            (isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : AppColors.surfaceVariant),
+        borderRadius: BorderRadius.circular(AppSizes.radiusSm),
+      ),
+      child: child,
+    );
+  }
+ 
+  Widget _card(BuildContext context, List<Widget> children,
+      {Color? borderColor}) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final radius = BorderRadius.circular(AppSizes.radiusLg);
+ 
     return Container(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-        border: Border.all(color: Theme.of(context).dividerColor),
+        borderRadius: radius,
+        boxShadow: isDark
+            ? null
+            : [
+                BoxShadow(
+                  color: AppColors.textDark.withValues(alpha: 0.04),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
       ),
-      child: Column(children: children),
+      // Material (instead of a decorated Container) so tile ripples are visible.
+      child: Material(
+        color: Theme.of(context).cardColor,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: radius,
+          side: BorderSide(
+            color: borderColor ?? Theme.of(context).dividerColor,
+          ),
+        ),
+        child: Column(children: children),
+      ),
     );
   }
-
+ 
   Widget _buildListTile({
     required BuildContext context,
     required IconData icon,
@@ -393,18 +476,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     Color? iconBackgroundColor,
     String? trailingText,
     String? subtitle,
+    IconData trailingIcon = LucideIcons.chevronRight,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(
           horizontal: AppSizes.lg, vertical: AppSizes.xs),
-      leading: Container(
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: iconBackgroundColor ?? (isDark ? Colors.white.withValues(alpha: 0.05) : AppColors.surfaceVariant),
-          borderRadius: BorderRadius.circular(AppSizes.radiusSm),
-        ),
-        child: Icon(icon, color: iconColor ?? (isDark ? Colors.white70 : AppColors.textDark), size: 20),
+      leading: _iconTile(
+        isDark: isDark,
+        background: iconBackgroundColor,
+        child: Icon(icon,
+            color: iconColor ?? (isDark ? Colors.white70 : AppColors.textDark),
+            size: 20),
       ),
       title: Text(title,
           style: TextStyle(
@@ -427,11 +510,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     fontWeight: FontWeight.w500)),
             const SizedBox(width: AppSizes.sm),
           ],
-          Icon(LucideIcons.chevronRight,
-              color: isDark ? Colors.white10 : AppColors.textLight, size: 20),
+          Icon(trailingIcon,
+              color: isDark ? Colors.white38 : AppColors.textLight,
+              size: trailingIcon == LucideIcons.chevronRight ? 20 : 18),
         ],
       ),
       onTap: onTap,
     );
   }
 }
+ 
