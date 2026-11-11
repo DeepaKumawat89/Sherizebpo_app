@@ -750,12 +750,14 @@ class _LoginScreenState extends State<LoginScreen> {
               context, AppRoutes.verifyGate, (_) => false);
         },
         onCodeSent: (verificationId) {
+          if (mounted) {
+            setState(() => _loading = false);
+          }
           if (!mounted ||
               !_mobileLogin ||
               ModalRoute.of(context)?.isCurrent != true) {
             return;
           }
-          setState(() => _loading = false);
           showModalBottomSheet<void>(
             context: context,
             isScrollControlled: true,
@@ -777,10 +779,10 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         },
         onError: (error) {
-          if (!mounted || !_mobileLogin) return;
+          if (!mounted) return;
           setState(() {
             _loading = false;
-            _error = error;
+            if (_mobileLogin) _error = error;
           });
         },
       );
@@ -790,9 +792,7 @@ class _LoginScreenState extends State<LoginScreen> {
         _loading = false;
         _error = 'Failed to send OTP. Please try again.';
       });
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    } 
   }
  
   InputDecoration _decoration(String label, IconData icon) => InputDecoration(
@@ -868,7 +868,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 decoration: _decoration('Mobile number', LucideIcons.phone)
                     .copyWith(prefixText: '+91 ', counterText: ''),
                 validator: (value) =>
-                    RegExp(r'^\d{10}$').hasMatch(value?.trim() ?? '')
+                    RegExp(r'^[6-9]\d{9}$').hasMatch(value?.trim() ?? '')
                         ? null
                         : 'Enter a valid 10-digit mobile number',
                 onFieldSubmitted: (_) => _sendOtp(),
@@ -1013,8 +1013,8 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               child: Material(
                 color: Colors.transparent,
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(100),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
                   onTap: _loading
                       ? null
                       : _mobileLogin
@@ -1025,13 +1025,15 @@ class _LoginScreenState extends State<LoginScreen> {
                       Expanded(
                         child: Center(
                           child: _loading
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 22,
                                   height: 22,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
                                     color: Colors.white,
-                                    semanticsLabel: 'Signing in',
+                                    semanticsLabel: _mobileLogin
+                                        ? 'Sending OTP'
+                                        : 'Signing in',
                                   ),
                                 )
                               : Text(
@@ -1403,4 +1405,3 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 }
-

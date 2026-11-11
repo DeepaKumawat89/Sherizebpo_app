@@ -254,9 +254,19 @@ class AuthService extends ChangeNotifier {
     required Function(String error) onError,
     VoidCallback? onVerified,
   }) async {
+    final normalizedPhone = phoneNumber.trim();
+    if (!RegExp(r'^\+[1-9]\d{7,14}$').hasMatch(normalizedPhone)) {
+      onError('Invalid phone number format.');
+      return;
+    }
+    if (_isLoading) {
+      onError('An OTP request is already in progress. Please wait.');
+      return;
+    }
+
     final request = ++_otpRequest;
-    final resendToken = _otpPhone == phoneNumber ? _resendToken : null;
-    _otpPhone = phoneNumber;
+    final resendToken = _otpPhone == normalizedPhone ? _resendToken : null;
+    _otpPhone = normalizedPhone;
     _resendToken = null;
     _verificationId = null;
     _webConfirmationResult = null;
@@ -275,7 +285,7 @@ class AuthService extends ChangeNotifier {
 
         try {
           final result = await _auth.signInWithPhoneNumber(
-            phoneNumber,
+            normalizedPhone,
             _webRecaptchaVerifier,
           );
           if (request != _otpRequest) return;
@@ -319,7 +329,7 @@ class AuthService extends ChangeNotifier {
 
       // ── Native (Android / iOS) flow ──────────────────────────
       await _auth.verifyPhoneNumber(
-        phoneNumber: phoneNumber,
+        phoneNumber: normalizedPhone,
         forceResendingToken: resendToken,
         verificationCompleted: (PhoneAuthCredential credential) async {
           if (request != _otpRequest) return;
@@ -379,6 +389,11 @@ class AuthService extends ChangeNotifier {
   // ─── OTP Verification ────────────────────────────────────────
   Future<String?> verifyOtp(
       {required String smsCode, String? verificationId}) async {
+    final normalizedCode = smsCode.trim();
+    if (!RegExp(r'^\d{6}$').hasMatch(normalizedCode)) {
+      return 'Please enter the 6-digit OTP sent to your phone.';
+    }
+
     final vId = verificationId ?? _verificationId;
     if (vId == null || _verificationId == null) {
       return 'Session expired. Please request OTP again.';
@@ -391,13 +406,13 @@ class AuthService extends ChangeNotifier {
 
     try {
       if (kIsWeb && _webConfirmationResult != null) {
-        final result = await _webConfirmationResult!.confirm(smsCode);
+        final result = await _webConfirmationResult!.confirm(normalizedCode);
         return await _handleSuccessfulSignIn(result.user, phoneVerified: true);
       }
 
       final credential = PhoneAuthProvider.credential(
         verificationId: vId,
-        smsCode: smsCode,
+        smsCode: normalizedCode,
       );
       return await _signInWithCredential(credential);
     } catch (e) {

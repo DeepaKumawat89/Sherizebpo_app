@@ -635,22 +635,11 @@ class _OtpScreenState extends State<OtpScreen> {
     }
   }
  
-  // ─── Key Handler (for backspace on empty field) ─────────────
-  void _onKeyEvent(KeyEvent event, int index) {
-    if (event is KeyDownEvent &&
-        event.logicalKey == LogicalKeyboardKey.backspace &&
-        _controllers[index].text.isEmpty &&
-        index > 0) {
-      _controllers[index - 1].clear();
-      _focusNodes[index - 1].requestFocus();
-    }
-  }
- 
   // ─── Verify OTP ─────────────────────────────────────────────
   Future<void> _onVerify() async {
     if (_isLoading || _isResending) return;
  
-    if (!_isOtpComplete) {
+    if (!RegExp(r'^\d{6}$').hasMatch(_otpValue)) {
       setState(() =>
           _errorText = 'Please enter all ${AppConstants.otpLength} digits');
       return;
@@ -1061,61 +1050,56 @@ class _OtpScreenState extends State<OtpScreen> {
               ]
             : null,
       ),
-      child: KeyboardListener(
-        focusNode: FocusNode(), // wrapper focus node for key events
-        onKeyEvent: (event) => _onKeyEvent(event, index),
-        child: TextField(
-          controller: _controllers[index],
-          focusNode: _focusNodes[index],
-          keyboardType: TextInputType.number,
-          textAlign: TextAlign.center,
-          // Box 0 accepts the full code so the OS one-time-code autofill can
-          // deliver it here; _onDigitChanged then distributes it to the rest.
-          maxLength: index == 0 ? AppConstants.otpLength : 1,
-          autofillHints:
-              index == 0 ? const [AutofillHints.oneTimeCode] : null,
-          inputFormatters: [
-            FilteringTextInputFormatter.digitsOnly,
-          ],
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w800,
-              ),
-          decoration: InputDecoration(
-            counterText: '',
-            filled: true,
-            fillColor: isFilled ? AppColors.surfaceVariant : AppColors.surface,
-            contentPadding: const EdgeInsets.symmetric(vertical: AppSizes.base),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-              borderSide: BorderSide(
-                color: _errorText != null
-                    ? AppColors.error
-                    : (isFocused ? AppColors.primary : AppColors.border),
-                width: isFocused ? 2.0 : 1.5,
-              ),
+      child: TextField(
+        controller: _controllers[index],
+        focusNode: _focusNodes[index],
+        keyboardType: TextInputType.number,
+        textAlign: TextAlign.center,
+        // Box 0 accepts the full code so the OS one-time-code autofill can
+        // deliver it here; _onDigitChanged then distributes it to the rest.
+        maxLength: index == 0 ? AppConstants.otpLength : 1,
+        autofillHints: index == 0 ? const [AutofillHints.oneTimeCode] : null,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+        ],
+        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+              color: AppColors.primary,
+              fontWeight: FontWeight.w800,
             ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-              borderSide: BorderSide(
-                color: _errorText != null
-                    ? AppColors.error
-                    : (isFilled
-                        ? AppColors.primary.withValues(alpha: 0.5)
-                        : AppColors.border),
-                width: 1.5,
-              ),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-              borderSide: BorderSide(
-                color: _errorText != null ? AppColors.error : AppColors.primary,
-                width: 2.0,
-              ),
+        decoration: InputDecoration(
+          counterText: '',
+          filled: true,
+          fillColor: isFilled ? AppColors.surfaceVariant : AppColors.surface,
+          contentPadding: const EdgeInsets.symmetric(vertical: AppSizes.base),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            borderSide: BorderSide(
+              color: _errorText != null
+                  ? AppColors.error
+                  : (isFocused ? AppColors.primary : AppColors.border),
+              width: isFocused ? 2.0 : 1.5,
             ),
           ),
-          onChanged: (value) => _onDigitChanged(value, index),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            borderSide: BorderSide(
+              color: _errorText != null
+                  ? AppColors.error
+                  : (isFilled
+                      ? AppColors.primary.withValues(alpha: 0.5)
+                      : AppColors.border),
+              width: 1.5,
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(AppSizes.radiusMd),
+            borderSide: BorderSide(
+              color: _errorText != null ? AppColors.error : AppColors.primary,
+              width: 2.0,
+            ),
+          ),
         ),
+        onChanged: (value) => _onDigitChanged(value, index),
       ),
     );
   }

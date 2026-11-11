@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:human_bpo/screens/dashboard/widgets/daily_progress_card.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/constants.dart';
@@ -128,6 +129,9 @@ class _DashboardScreenState extends State<DashboardScreen>
                             ),
                             sliver: SliverList(
                               delegate: SliverChildListDelegate([
+                                  // ── Daily Work Session (time utilization) ──
+                                  DailyProgressCard(uid: user.uid, targetHours: 8),
+
                                 // ── Global Announcement Banner ──
                                 if (settings.announcement.trim().isNotEmpty)
                                   _buildAnnouncement(
