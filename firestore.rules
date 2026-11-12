@@ -698,13 +698,98 @@ service cloud.firestore {
           sessionId.matches('^' + request.auth.uid +
             '_[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
 
-      allow create: if isAuthenticated() &&
-        request.resource.data.userId == request.auth.uid &&
-        sessionId.matches('^' + request.auth.uid + '_[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+      function isSessionOwner() {
+        return isAuthenticated()
+          && resource.data.userId == request.auth.uid
+          && request.resource.data.userId == request.auth.uid
+          && request.resource.data.date == resource.data.date
+          && sessionId.matches('^' + request.auth.uid +
+            '_[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+      }
 
-      allow update: if isAuthenticated() &&
-        resource.data.userId == request.auth.uid &&
-        request.resource.data.userId == request.auth.uid;
+      function isProgressUpdate() {
+        return isSessionOwner() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'progressNote', 'progressPercent', 'updatedAt'
+        ]) &&
+        request.resource.data.progressNote is string &&
+        request.resource.data.progressNote.size() <= 300 &&
+        request.resource.data.progressPercent is int &&
+        request.resource.data.progressPercent >= 0 &&
+        request.resource.data.progressPercent <= 100 &&
+        request.resource.data.updatedAt == request.time;
+      }
+
+      function isLifecycleUpdate() {
+        let before = resource.data;
+        let after = request.resource.data;
+        let segmentCount = after.segments.size();
+        let beforeStatus = before.get('status', 'idle');
+        return isSessionOwner()
+          && (beforeStatus == 'idle'
+            || after.startedAt == before.startedAt)
+          && after.segments is list
+          && after.events is list
+          && after.totalWorkedSeconds is int
+          && after.totalWorkedSeconds >= 0
+          && after.totalBreakSeconds is int
+          && after.totalBreakSeconds >= 0
+          && after.lastEventAt is timestamp
+          && after.updatedAt == request.time
+          && after.diff(before).affectedKeys().hasOnly([
+            'status', 'segments', 'events', 'totalWorkedSeconds',
+            'totalBreakSeconds', 'lastEventAt', 'updatedAt', 'endedAt',
+            'createdAt', 'startedAt'
+          ])
+          && (
+            (beforeStatus == 'idle'
+              && after.status == 'active'
+              && after.startedAt is timestamp
+              && segmentCount == 1
+              && after.segments[0].type == 'work'
+              && after.segments[0].end == null)
+            ||
+            (beforeStatus == 'active'
+              && after.status == 'on_break'
+              && segmentCount == before.segments.size() + 1
+              && after.segments[segmentCount - 1].type == 'break'
+              && after.segments[segmentCount - 1].end == null)
+            ||
+            (beforeStatus == 'on_break'
+              && after.status == 'active'
+              && segmentCount == before.segments.size() + 1
+              && after.segments[segmentCount - 1].type == 'work'
+              && after.segments[segmentCount - 1].end == null)
+            ||
+            ((beforeStatus == 'active' || beforeStatus == 'on_break')
+              && after.status == 'ended'
+              && after.endedAt is timestamp
+              && segmentCount == before.segments.size()
+              && after.segments[segmentCount - 1].end is timestamp)
+          );
+      }
+
+      allow create: if isAuthenticated()
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.date is string
+        && sessionId == request.auth.uid + '_' + request.resource.data.date
+        && sessionId.matches('^' + request.auth.uid +
+          '_[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.data.status == 'active'
+        && request.resource.data.startedAt is timestamp
+        && request.resource.data.segments is list
+        && request.resource.data.segments.size() == 1
+        && request.resource.data.segments[0].type == 'work'
+        && request.resource.data.segments[0].end == null
+        && request.resource.data.events is list
+        && request.resource.data.events.size() == 1
+        && request.resource.data.events[0].type == 'start_day'
+        && request.resource.data.totalWorkedSeconds == 0
+        && request.resource.data.totalBreakSeconds == 0
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.createdAt == request.time;
+
+      allow update: if isProgressUpdate() || isLifecycleUpdate();
 
       allow delete: if false;
     }

@@ -126,6 +126,52 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
         return AppColors.primary;
     }
   }
+
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(title),
+            content: Text(message),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: Text(confirmLabel),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+  }
+
+  Future<void> _confirmStart() async {
+    final ok = await _confirm(
+      title: 'Start your day?',
+      message: 'Your 8-hour goal timer will begin now and will continue during breaks.',
+      confirmLabel: 'Start Day',
+    );
+    if (ok) await _run(() => _service.start(widget.uid));
+  }
+
+  Future<void> _confirmBreak() async {
+    final ok = await _confirm(
+      title: 'Take a break?',
+      message: 'Your break start time will be recorded. The daily goal timer will keep running.',
+      confirmLabel: 'Take Break',
+    );
+    if (ok) await _run(() => _service.startBreak(widget.uid));
+  }
  
   // ── dialogs / sheets ───────────────────────────────────────
   Future<void> _confirmEnd(WorkSession s) async {
@@ -428,8 +474,9 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
  
   Widget _hero(WorkSession s, Duration worked, Duration onBreak, bool isDark) {
     final goal = Duration(hours: widget.targetHours);
-    final progress = (worked.inSeconds / goal.inSeconds).clamp(0.0, 1.0);
-    final goalReached = worked >= goal;
+    final elapsed = s.sessionAt(_now);
+    final progress = (elapsed.inSeconds / goal.inSeconds).clamp(0.0, 1.0);
+    final goalReached = elapsed >= goal;
     final textMain = isDark ? Colors.white : AppColors.textDark;
     final textSub = isDark ? Colors.white54 : AppColors.textMuted;
  
@@ -470,7 +517,7 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      _hms(worked),
+                      _hms(elapsed),
                       style: TextStyle(
                         fontSize: ring < 120 ? 17 : 20,
                         fontWeight: FontWeight.w800,
@@ -510,7 +557,7 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
                 _StatTile(
                   icon: LucideIcons.briefcase,
                   color: _kWork,
-                  label: 'Worked',
+                  label: 'Active work',
                   value: _hm(worked),
                 ),
                 const SizedBox(height: 12),
@@ -630,7 +677,7 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
           gradient: AppDecorations.primaryGradient,
           shadowColor: AppColors.primary,
           loading: _busy,
-          onTap: () => _run(() => _service.start(widget.uid)),
+          onTap: _confirmStart,
         );
       case WorkStatus.active:
         return Row(
@@ -646,7 +693,7 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
                     end: Alignment.bottomRight),
                 shadowColor: _kBreak,
                 loading: _busy,
-                onTap: () => _run(() => _service.startBreak(widget.uid)),
+                onTap: _confirmBreak,
               ),
             ),
             const SizedBox(width: 10),
@@ -659,7 +706,7 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
             Expanded(
               flex: 3,
               child: _GradientButton(
-                label: 'Resume',
+                label: 'Resume Work',
                 icon: LucideIcons.play,
                 gradient: AppDecorations.primaryGradient,
                 shadowColor: AppColors.primary,

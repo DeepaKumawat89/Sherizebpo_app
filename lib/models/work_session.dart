@@ -107,4 +107,13 @@ class WorkSession {
   Duration breakAt(DateTime now) => segments
       .where((s) => s.isBreak)
       .fold(Duration.zero, (a, s) => a + s.duration(now));
+
+  /// Full elapsed session time, including breaks. The daily goal intentionally
+  /// continues while an employee is on break.
+  Duration sessionAt(DateTime now) {
+    if (startedAt == null) return Duration.zero;
+    final end = endedAt ?? now;
+    if (end.isBefore(startedAt!)) return Duration.zero;
+    return end.difference(startedAt!);
+  }
 }

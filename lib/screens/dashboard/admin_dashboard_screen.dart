@@ -2074,6 +2074,7 @@ import 'package:intl/intl.dart';
 import '../../core/constants/constants.dart';
 import '../../services/auth_service.dart';
 import '../../routes.dart';
+import 'widgets/admin_work_session_monitor.dart';
  
 /// Admin Dashboard Screen — Role-aware, task-reviewer focused.
 class AdminDashboardScreen extends StatefulWidget {
@@ -2350,6 +2351,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           final isKycAdmin = has('kyc_admin');
           final isPaymentAdmin = has('payment_admin');
           final isSupportAdmin = has('support_admin');
+          final canViewWorkSessions = isSuper ||
+              activeRoles.contains('task_review_admin') ||
+              activeRoles.contains('kyc_admin') ||
+              activeRoles.contains('payment_admin');
           final roleLabel = superView
               ? 'Super Admin'
               : activeRoles.map(_roleLabel).join(' \u2022 ');
@@ -2479,6 +2484,23 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         ),
                       ),
                     ],
+
+                    if (canViewWorkSessions) ...[
+                      const SizedBox(height: AppSizes.sm),
+                      _ActionTile(
+                        icon: LucideIcons.clock,
+                        title: 'Employee Work Sessions',
+                        subtitle: 'View attendance, breaks, and daily timelines',
+                        color: AppColors.info,
+                        onTap: () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => AdminWorkSessionScreen(
+                              firestore: _firestore,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
  
                     // ── Support Desk (support_admin + full admins) ──────────
                     if (has('support_admin')) ...[
@@ -2531,7 +2553,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       const SizedBox(height: AppSizes.md),
                       _buildPlatformStatsSection(isDark),
                     ],
- 
+
                     // ── Review History (task_review_admin) ──────────────────────
                     if (holds('task_review_admin')) ...[
                       const SizedBox(height: 32),
