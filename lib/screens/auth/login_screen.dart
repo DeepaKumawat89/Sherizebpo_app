@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import '../../core/constants/constants.dart';
 import '../../services/auth_service.dart';
 import '../../routes.dart';
+import '../jobs/job_banner_popup.dart';
+import '../jobs/public_jobs_screen.dart';
 import 'otp_screen.dart';
 import '../../widgets/developer_credit.dart';
  
@@ -36,11 +38,35 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _loading = false;
   String? _error;
+  bool _checkedForJobPopup = false;
  
   @override
   void initState() {
     super.initState();
     _useEmployeeId = widget.useEmployeeId;
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_checkedForJobPopup) return;
+    _checkedForJobPopup = true;
+    final arguments = ModalRoute.of(context)?.settings.arguments;
+    final showJobs = arguments is Map && arguments['showJobPopup'] == true;
+    if (showJobs) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _showJobPopup());
+    }
+  }
+
+  Future<void> _showJobPopup() async {
+    if (!mounted) return;
+    final selectedJob = await showJobBannerPopup(context);
+    if (!mounted || selectedJob == null) return;
+    await showPublicJobApplicationSheet(
+      context,
+      jobId: selectedJob.id,
+      jobTitle: selectedJob.title,
+    );
   }
  
   @override

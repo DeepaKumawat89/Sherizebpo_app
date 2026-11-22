@@ -356,7 +356,11 @@ class _JobCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: FilledButton.icon(
-              onPressed: () => _openApplySheet(context, jobId, title),
+              onPressed: () => showPublicJobApplicationSheet(
+                context,
+                jobId: jobId,
+                jobTitle: title,
+              ),
               icon: const Icon(LucideIcons.arrowUpRight, size: 18),
               style: FilledButton.styleFrom(
                 minimumSize: const Size(0, 48),
@@ -408,18 +412,23 @@ class _JobCard extends StatelessWidget {
     );
   }
  
-  void _openApplySheet(BuildContext context, String jobId, String jobTitle) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      constraints: const BoxConstraints(maxWidth: 600),
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => _ApplySheet(jobId: jobId, jobTitle: jobTitle),
-    );
-  }
+}
+
+Future<void> showPublicJobApplicationSheet(
+  BuildContext context, {
+  required String jobId,
+  required String jobTitle,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    constraints: const BoxConstraints(maxWidth: 600),
+    backgroundColor: Theme.of(context).colorScheme.surface,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+    builder: (_) => _ApplySheet(jobId: jobId, jobTitle: jobTitle),
+  );
 }
  
 class _ApplySheet extends StatefulWidget {
