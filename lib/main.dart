@@ -79,10 +79,6 @@ void main() {
           ChangeNotifierProvider(create: (_) => SecurityService()),
           ChangeNotifierProvider(create: (_) => PlatformSettingsService()),
           ChangeNotifierProvider(create: (_) => CreditConfigService()),
-          Provider(
-            create: (_) => ApiService(),
-            dispose: (_, api) => api.dispose(),
-          ),
           Provider(create: (_) => TaskService()),
         ],
         child: const SherizeApp(),

@@ -27,16 +27,12 @@ class AppColors {
   // ─── Accents ────────────────────────────────────────────────
   static const Color accent = Color(0xFFF59E0B); // Amber 500   — Highlights
   static const Color accentLight = Color(0xFFFBBF24); // Amber 400
-  static const Color accentSoft = Color(0xFFFEF3C7); // Amber 100
 
   static const Color teal = Color(0xFF14B8A6); // Teal 500    — Secondary accent
-  static const Color tealSoft = Color(0xFFCCFBF1); // Teal 100
 
   static const Color violet = Color(0xFF8B5CF6); // Violet 500  — Premium accent
-  static const Color violetSoft = Color(0xFFEDE9FE); // Violet 100
 
   static const Color rose = Color(0xFFF43F5E); // Rose 500
-  static const Color roseSoft = Color(0xFFFFF1F2); // Rose 50
 
   // ─── Backgrounds ────────────────────────────────────────────
   static const Color background = Color(0xFFF8FAFC); // Slate 50    — Page bg
@@ -55,13 +51,10 @@ class AppColors {
       Color(0xFF94A3B8); // Slate 400  — Placeholders
   static const Color textLight = Color(0xFFCBD5E1); // Slate 300   — Disabled
   static const Color textLightest = Color(0xFFF8FAFC); // Slate 50    — On dark
-  static const Color textTitle = Color(0xFF0F172A); // Slate 900 — Headings (Legacy)
 
   // ─── Borders & Dividers ─────────────────────────────────────
   static const Color border = Color(0xFFE2E8F0); // Slate 200
   static const Color borderLight = Color(0xFFF1F5F9); // Slate 100
-  static const Color borderFocus = Color(0xFF6366F1); // Indigo 500
-  static const Color divider = Color(0xFFE2E8F0); // Slate 200
 
   // ─── Semantic ───────────────────────────────────────────────
   static const Color success = Color(0xFF10B981); // Emerald 500 — Brighter
@@ -85,7 +78,6 @@ class AppColors {
   static const Color infoLight = Color(0xFF60A5FA); // Blue 400     — For dark mode
 
   // ─── Navigation ─────────────────────────────────────────────
-  static const Color navActive = Color(0xFF6366F1); // Indigo 500
   static const Color navInactive = Color(0xFF94A3B8); // Slate 400
 
   // ─── Glassmorphism ──────────────────────────────────────────

@@ -24,13 +24,35 @@ class WorkSessionService {
         snap.exists ? WorkSession.fromDoc(snap) : WorkSession.empty(uid, date));
   }
 
-  Future<void> start(String uid) => _transition(uid, 'start_day');
+  Future<void> start(
+    String uid, {
+    AttendanceLocation? location,
+    DateTime? occurredAt,
+  }) =>
+      _transition(uid, 'start_day', location: location, occurredAt: occurredAt);
 
-  Future<void> startBreak(String uid) => _transition(uid, 'start_break');
+  Future<void> startBreak(
+    String uid, {
+    AttendanceLocation? location,
+    DateTime? occurredAt,
+  }) =>
+      _transition(uid, 'start_break',
+          location: location, occurredAt: occurredAt);
 
-  Future<void> resume(String uid) => _transition(uid, 'resume_work');
+  Future<void> resume(
+    String uid, {
+    AttendanceLocation? location,
+    DateTime? occurredAt,
+  }) =>
+      _transition(uid, 'resume_work',
+          location: location, occurredAt: occurredAt);
 
-  Future<void> endDay(String uid) => _transition(uid, 'end_day');
+  Future<void> endDay(
+    String uid, {
+    AttendanceLocation? location,
+    DateTime? occurredAt,
+  }) =>
+      _transition(uid, 'end_day', location: location, occurredAt: occurredAt);
 
   Future<void> saveProgress(String uid,
       {required String note, required int percent}) {
@@ -45,8 +67,9 @@ class WorkSessionService {
   /// Applies one lifecycle event atomically in Firestore. Reading the current
   /// status inside the transaction prevents double taps and stale clients from
   /// appending duplicate or out-of-order segments.
-  Future<void> _transition(String uid, String action) async {
-    final date = todayKey();
+  Future<void> _transition(String uid, String action,
+      {AttendanceLocation? location, DateTime? occurredAt}) async {
+    final date = todayKey(occurredAt);
     final ref = _ref(uid, date);
 
     await _db.runTransaction((transaction) async {
@@ -60,7 +83,9 @@ class WorkSessionService {
           .whereType<Map>()
           .map((event) => Map<String, dynamic>.from(event))
           .toList();
-      final now = DateTime.now();
+      // The action time is captured before GPS/reverse-geocoding work so that
+      // a slow address lookup does not move attendance timestamps forward.
+      final now = occurredAt ?? DateTime.now();
       final timestamp = Timestamp.fromDate(now);
       final update = <String, dynamic>{};
 
@@ -70,7 +95,7 @@ class WorkSessionService {
             throw StateError('This work day has already started.');
           }
           segments.add(WorkSegment(isBreak: false, start: now));
-          events.add({'type': 'start_day', 'at': timestamp});
+          events.add(_event('start_day', timestamp, location));
           update.addAll({'status': 'active', 'startedAt': timestamp});
           break;
         case 'start_break':
@@ -79,7 +104,7 @@ class WorkSessionService {
           }
           _closeOpenSegment(segments, now, expectedBreak: false);
           segments.add(WorkSegment(isBreak: true, start: now));
-          events.add({'type': 'break_start', 'at': timestamp});
+          events.add(_event('break_start', timestamp, location));
           update['status'] = 'on_break';
           break;
         case 'resume_work':
@@ -95,6 +120,7 @@ class WorkSessionService {
             'type': 'break_end',
             'at': timestamp,
             'durationSeconds': now.difference(breakStart).inSeconds,
+            if (location != null) 'location': location.toMap(),
           });
           segments.add(WorkSegment(isBreak: false, start: now));
           update['status'] = 'active';
@@ -117,7 +143,7 @@ class WorkSessionService {
               'durationSeconds': now.difference(segmentStart).inSeconds,
             });
           }
-          events.add({'type': 'end_day', 'at': timestamp});
+          events.add(_event('end_day', timestamp, location));
           update.addAll({'status': 'ended', 'endedAt': timestamp});
           break;
         default:
@@ -152,6 +178,17 @@ class WorkSessionService {
       );
     });
   }
+
+  Map<String, dynamic> _event(
+    String type,
+    Timestamp at,
+    AttendanceLocation? location,
+  ) =>
+      {
+        'type': type,
+        'at': at,
+        if (location != null) 'location': location.toMap(),
+      };
 
   DateTime _closeOpenSegment(
     List<WorkSegment> segments,

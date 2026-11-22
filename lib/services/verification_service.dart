@@ -103,14 +103,4 @@ class VerificationService {
     }
   }
 
-  // ─── Quick check ────────────────────────────────────────────
-  /// Reloads Firebase Auth user and returns current emailVerified flag.
-  Future<bool> isFirebaseEmailVerified() async {
-    try {
-      await _auth.currentUser?.reload();
-      return _auth.currentUser?.emailVerified ?? false;
-    } catch (_) {
-      return false;
-    }
-  }
 }

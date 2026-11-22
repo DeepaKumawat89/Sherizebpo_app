@@ -5,7 +5,6 @@ import 'package:firebase_auth_platform_interface/firebase_auth_platform_interfac
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import '../core/constants/constants.dart';
 import '../core/utils/string_utils.dart';
 import 'notification_service.dart';
@@ -506,41 +505,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  // ─── Google Sign-In ──────────────────────────────────────────
-  Future<String?> signInWithGoogle() async {
-    _isLoading = true;
-    notifyListeners();
-
-    try {
-      final GoogleSignIn googleSignIn = GoogleSignIn();
-      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-
-      if (googleUser == null) {
-        _isLoading = false;
-        notifyListeners();
-        return 'Google Sign-In cancelled by user.';
-      }
-
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
-      final AuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
-        idToken: googleAuth.idToken,
-      );
-
-      final userCredential = await _auth.signInWithCredential(credential);
-      return await _handleSuccessfulSignIn(userCredential.user);
-    } catch (e) {
-      _isLoading = false;
-      notifyListeners();
-      debugPrint('Google Sign-In Exception: $e');
-      if (e is FirebaseAuthException) {
-        return e.message ?? 'Google Sign-In failed.';
-      }
-      return 'Google Sign-In failed: ${e.toString()}';
-    }
-  }
-
   // ─── Shared Sign-In Logic ────────────────────────────────────
   Future<String?> _signInWithCredential(PhoneAuthCredential credential) async {
     final request = _otpRequest;
@@ -809,16 +773,6 @@ class AuthService extends ChangeNotifier {
     }
   }
 
-  Future<bool> checkEmailVerified() async {
-    try {
-      await _auth.currentUser?.reload();
-      final freshUser = _auth.currentUser;
-      return freshUser?.emailVerified ?? false;
-    } catch (e) {
-      debugPrint('Error checking email verification: $e');
-      return false;
-    }
-  }
 
   // ─── Logout ─────────────────────────────────────────────────
   Future<void> logout() async {
@@ -852,11 +806,4 @@ class AuthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ─── Onboarding ─────────────────────────────────────────────
-  Future<void> completeOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(AppConstants.onboardingKey, true);
-    _onboardingComplete = true;
-    notifyListeners();
-  }
 }

@@ -81,21 +81,6 @@ class ErrorLoggingService {
     );
   }
 
-  /// Manually log an error (for try/catch blocks that want persistent logging).
-  static Future<void> logManualError({
-    required String message,
-    String? stack,
-    String source = 'manual',
-    Map<String, dynamic>? metadata,
-  }) async {
-    await _logError(
-      message: message,
-      stack: stack,
-      source: source,
-      metadata: metadata,
-    );
-  }
-
   /// Internal method that writes the error to Firestore.
   /// Silently fails if write fails (don't throw during error handling).
   static Future<void> _logError({

@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'services/services.dart';
+
 import 'services/auth_service.dart';
-
-
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/otp_screen.dart';
 import 'screens/auth/signup_screen.dart';
@@ -106,9 +104,6 @@ class AppRoutes {
   static const String devLogin = '/dev/access';
   static const String devDashboard = '/dev/console';
 
-  // ─── Initial Route ──────────────────────────────────────────
-  static const String initial = onboarding;
-
   // ─── Route Map ──────────────────────────────────────────────
   static Map<String, WidgetBuilder> get routes => {
         onboarding: (_) => const OnboardingScreen(),
@@ -140,7 +135,8 @@ class AppRoutes {
         adminLogin: (_) => const AdminLoginScreen(),
         adminRoleSelect: (_) => const AdminRoleSelectScreen(),
         adminDashboard: (context) => AdminDashboardScreen(
-          activeRole: ModalRoute.of(context)?.settings.arguments as String?),
+            activeRole:
+                ModalRoute.of(context)?.settings.arguments as String?),
         admin: (_) => const AdminDashboardScreen(),
         adminReview: (_) => const AdminReviewScreen(),
         adminCreateTask: (_) => const AdminCreateTaskScreen(),

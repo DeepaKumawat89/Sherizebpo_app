@@ -794,6 +794,23 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Live location is private to the employee and admin roles. All writes are
+    // server-authoritative through locationTracking callables.
+    match /location_tracking_consents/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false;
+    }
+    match /employee_locations/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow write: if false;
+    }
+    match /employee_location_history/{sessionId}/points/{pointId} {
+      allow read: if isAdmin()
+        || (isAuthenticated() && sessionId.matches('^' + request.auth.uid +
+          '_[0-9]{4}-[0-9]{2}-[0-9]{2}$'));
+      allow write: if false;
+    }
+
     // ─── Fail-closed default ───────────────────────────────────
     // Any collection not explicitly defined above is denied
     match /{document=**} {

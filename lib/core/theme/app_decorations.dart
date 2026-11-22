@@ -159,29 +159,10 @@ class AppDecorations {
     end: Alignment.bottomRight,
   );
 
-  static const LinearGradient surfaceGradient = LinearGradient(
-    colors: [AppColors.background, AppColors.surface],
-    begin: Alignment.topCenter,
-    end: Alignment.bottomCenter,
-  );
-
-  // Mesh-style gradient for hero sections
-  static const LinearGradient heroGradient = LinearGradient(
-    colors: [Color(0xFF6366F1), Color(0xFF8B5CF6), Color(0xFF6366F1)],
-    begin: Alignment.topLeft,
-    end: Alignment.bottomRight,
-    stops: [0.0, 0.5, 1.0],
-  );
-
   // ─── Icon Box ──────────────────────────────────────────────
   static BoxDecoration iconBox({Color? color}) => BoxDecoration(
         color: (color ?? AppColors.primary).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-      );
-
-  static BoxDecoration iconBoxRound({Color? color}) => BoxDecoration(
-        color: (color ?? AppColors.primary).withValues(alpha: 0.1),
-        shape: BoxShape.circle,
       );
 
   // ─── Input Decoration ─────────────────────────────────────
@@ -204,10 +185,4 @@ class AppDecorations {
         ],
       );
 
-  // ─── Status Badge ─────────────────────────────────────────
-  static BoxDecoration statusBadge(Color color) => BoxDecoration(
-        color: color.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(AppSizes.radiusRound),
-        border: Border.all(color: color.withValues(alpha: 0.2)),
-      );
 }

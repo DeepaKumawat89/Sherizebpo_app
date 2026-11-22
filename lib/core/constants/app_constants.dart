@@ -7,7 +7,6 @@ class AppConstants {
 
   // ─── App Info ───────────────────────────────────────────────
   static const String appName = 'Sherize';
-  static const String tagline = 'Empowering Women Everyday';
     static const String appVersion = '2.1.5';
 
   // ─── Developer Credit ───────────────────────────────────────
@@ -40,7 +39,6 @@ class AppConstants {
   static const String supportEmail = 'info@sherize.in';
   static const String supportPhone = '+917672073746';
   // Digits only, international format (no '+' or spaces) for wa.me links.
-  static const String whatsappNumber = '917672073746';
   static const String supportHours = 'Mon–Sat, 10 AM – 7 PM IST';
   static const String websiteUrl = 'https://sherize.in';
 
@@ -48,24 +46,17 @@ class AppConstants {
   static const String baseUrl = bool.fromEnvironment('USE_FIREBASE_EMULATORS')
       ? 'http://127.0.0.1:5001/demo-sherize-workflow/us-central1/api'
       : 'https://us-central1-sherize-bpo.cloudfunctions.net/api';
-  static const Duration apiTimeout = Duration(seconds: 30);
 
   // ─── Local Storage Keys ─────────────────────────────────────
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_data';
   static const String onboardingKey = 'onboarding_complete';
-  static const String themeKey = 'app_theme';
-  static const String languageKey = 'app_language';
 
   // ─── Formatting ─────────────────────────────────────────────
-  static const String currencySymbol = '₹';
   static const String countryCode = '+91';
 
   // ─── Pagination ─────────────────────────────────────────────
-  static const int defaultPageSize = 20;
 
   // ─── Validation ─────────────────────────────────────────────
   static const int otpLength = 6;
-  static const int phoneLength = 10;
-  static const int minPasswordLength = 8;
 }

@@ -4,12 +4,16 @@ import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
  
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:human_bpo/core/constants/app_colors.dart';
 import 'package:human_bpo/core/constants/app_sizes.dart';
 import 'package:human_bpo/core/theme/app_decorations.dart';
 import 'package:human_bpo/models/work_session.dart';
+import 'package:human_bpo/services/attendance_location_service.dart';
 import 'package:human_bpo/services/work_session_service.dart';
+import 'package:human_bpo/services/employee_location_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
  
 // Semantic colours for the session states.
@@ -32,19 +36,29 @@ class DailyProgressCard extends StatefulWidget {
   State<DailyProgressCard> createState() => _DailyProgressCardState();
 }
  
-class _DailyProgressCardState extends State<DailyProgressCard> {
+class _DailyProgressCardState extends State<DailyProgressCard>
+    with WidgetsBindingObserver {
   final _service = WorkSessionService();
+  final _attendanceLocation = AttendanceLocationService();
+  final _location = EmployeeLocationService.instance;
   late Stream<WorkSession> _stream;
   late String _streamDate;
   Timer? _ticker;
   DateTime _now = DateTime.now();
   bool _busy = false;
+  bool _stoppingForSessionEnd = false;
+  bool _hadLocationReadinessIssue = false;
+  Future<void>? _locationReadinessCheck;
  
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _streamDate = WorkSessionService.todayKey();
     _stream = _service.watchToday(widget.uid);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_checkLocationReadiness());
+    });
     // Repaint only. Real time is derived from timestamps, so it is safe
     // if the app is backgrounded or killed.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
@@ -65,8 +79,84 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
  
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _attendanceLocation.close();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    () async {
+      await _checkLocationReadiness();
+      if (!_location.isTracking) return;
+      final permission = await Geolocator.checkPermission();
+      final enabled = await Geolocator.isLocationServiceEnabled();
+      debugPrint('[LocationTracking] App resumed; permission=$permission, device location enabled=$enabled.');
+      if (!enabled || permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever ||
+          (defaultTargetPlatform == TargetPlatform.iOS &&
+              permission == LocationPermission.whileInUse)) {
+        await _location.stop();
+        if (mounted) setState(() {});
+      }
+    }();
+  }
+
+  Future<void> _checkLocationReadiness() {
+    final inProgress = _locationReadinessCheck;
+    if (inProgress != null) return inProgress;
+
+    final check = _performLocationReadinessCheck();
+    _locationReadinessCheck = check;
+    unawaited(check.whenComplete(() {
+      if (identical(_locationReadinessCheck, check)) {
+        _locationReadinessCheck = null;
+      }
+    }));
+    return check;
+  }
+
+  Future<void> _performLocationReadinessCheck() async {
+    try {
+      await _attendanceLocation.ensureForegroundReady();
+      if (_hadLocationReadinessIssue && mounted) {
+        _hadLocationReadinessIssue = false;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Location is ready. You can check in now.'),
+        ));
+      }
+    } on AttendanceLocationException catch (error) {
+      _hadLocationReadinessIssue = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            '${error.message} Return to Sherize after updating it; location will be checked again.',
+          ),
+          action: error.settingsAvailable
+              ? SnackBarAction(
+                  label: 'Settings',
+                  onPressed: error.openDeviceSettings
+                      ? Geolocator.openLocationSettings
+                      : Geolocator.openAppSettings,
+                )
+              : null,
+        ));
+      }
+    } catch (error, stackTrace) {
+      _hadLocationReadinessIssue = true;
+      debugPrint(
+        '[AttendanceLocation] Startup readiness check failed: $error\n$stackTrace',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+            'Location readiness could not be checked. Check GPS and permission before trying Check In.',
+          ),
+        ));
+      }
+    }
   }
  
   // ── helpers ────────────────────────────────────────────────
@@ -77,9 +167,17 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
     try {
       await action();
     } catch (e) {
+      debugPrint('[LocationTracking] Shift/location action failed: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('Could not update: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Could not update: $e'),
+          action: _location.lastPermissionIssue == null
+              ? null
+              : SnackBarAction(
+                  label: 'Settings',
+                  onPressed: _openLocationSettings,
+                ),
+        ));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -155,13 +253,212 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
         false;
   }
 
+  Future<AttendanceLocation?> _captureEventLocation() async {
+    try {
+      final location = await _attendanceLocation.capture();
+      if (location.addressUnavailable && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+            'Location captured, but the address is unavailable. Coordinates will still be saved.',
+          ),
+        ));
+      }
+      return location;
+    } on AttendanceLocationException catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(
+            '${error.message} The attendance action will continue without a location.',
+          ),
+          action: error.settingsAvailable
+              ? SnackBarAction(
+                  label: 'Settings',
+                  onPressed: error.openDeviceSettings
+                      ? Geolocator.openLocationSettings
+                      : Geolocator.openAppSettings,
+                )
+              : null,
+        ));
+      }
+      return null;
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+            'A fresh location could not be obtained. The attendance action will continue without a location.',
+          ),
+        ));
+      }
+      return null;
+    }
+  }
+
+  Future<AttendanceLocation?> _captureRequiredCheckInLocation() async {
+    final startupCheck = _locationReadinessCheck;
+    if (startupCheck != null) await startupCheck;
+    try {
+      final location = await _attendanceLocation.capture();
+      _hadLocationReadinessIssue = false;
+      return location;
+    } on AttendanceLocationException catch (error) {
+      _hadLocationReadinessIssue = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${error.message} Check-in was not saved. Please retry.'),
+          action: error.settingsAvailable
+              ? SnackBarAction(
+                  label: 'Settings',
+                  onPressed: error.openDeviceSettings
+                      ? Geolocator.openLocationSettings
+                      : Geolocator.openAppSettings,
+                )
+              : null,
+        ));
+      }
+      return null;
+    } catch (error, stackTrace) {
+      debugPrint(
+        '[AttendanceLocation] Required check-in capture failed: $error\n$stackTrace',
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+            'A fresh location is unavailable. Check-in was not saved. Check GPS and retry.',
+          ),
+        ));
+      }
+      return null;
+    }
+  }
+
   Future<void> _confirmStart() async {
-    final ok = await _confirm(
-      title: 'Start your day?',
-      message: 'Your 8-hour goal timer will begin now and will continue during breaks.',
-      confirmLabel: 'Start Day',
+    final share = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Start your day?'),
+        content: const Text(
+          'Your current location will be requested for this check-in. You may also choose to share live location with Sherize administrators during this active session. Live sharing is optional, uses background location while enabled, and stops when you end the day or turn it off. A limited shift history is retained for up to 30 days.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Start without sharing')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Allow and Start')),
+        ],
+      ),
     );
-    if (ok) await _run(() => _service.start(widget.uid));
+    if (share == null) return;
+    debugPrint('[LocationTracking] Employee confirmed shift start; location consent=$share.');
+    await _run(() async {
+      final occurredAt = DateTime.now();
+      final eventLocation = await _captureRequiredCheckInLocation();
+      if (eventLocation == null) return;
+      try {
+        await _service.start(
+          widget.uid,
+          location: eventLocation,
+          occurredAt: occurredAt,
+        );
+      } catch (error, stackTrace) {
+        debugPrint(
+          '[AttendanceLocation] Check-in write failed: $error\n$stackTrace',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Check-in could not be saved. Please retry.'),
+          ));
+        }
+        return;
+      }
+      debugPrint('[LocationTracking] Work session started.');
+      if (mounted) {
+        final message = eventLocation.addressUnavailable
+            ? 'Checked in successfully. Coordinates saved; address unavailable.'
+            : 'Checked in successfully with your current location.';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
+      }
+      if (!share) return;
+
+      var permission = false;
+      try {
+        permission = await _location.requestPermission();
+      } catch (error, stackTrace) {
+        _location.lastPermissionIssue = 'Location permission could not be checked.';
+        debugPrint('[LocationTracking] Permission check failed; shift remains active: $error\n$stackTrace');
+      }
+      debugPrint('[LocationTracking] Shift start permission ready=$permission.');
+      if (!permission) {
+        final issue = _location.lastPermissionIssue ?? 'Location permission was not granted.';
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: Text('$issue Your shift started without location sharing.'),
+            action: SnackBarAction(
+              label: 'Settings',
+              onPressed: _openLocationSettings,
+            ),
+          ));
+        }
+        return;
+      }
+      try {
+        await _location.enableConsent();
+        await _location.start();
+        if (mounted) setState(() {});
+      } catch (error, stackTrace) {
+        debugPrint(
+          '[LocationTracking] Check-in saved but live sharing failed: $error\n$stackTrace',
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+              'Check-in was saved, but live location sharing could not start.',
+            ),
+          ));
+        }
+      }
+    });
+  }
+
+  void _openLocationSettings() {
+    final issue = _location.lastPermissionIssue ?? '';
+    if (issue.startsWith('Turn on device Location')) {
+      Geolocator.openLocationSettings();
+    } else {
+      Geolocator.openAppSettings();
+    }
+  }
+
+  Future<void> _toggleLocationSharing(bool enabled) async {
+    if (!enabled) {
+      await _location.stop();
+      if (mounted) setState(() {});
+      return;
+    }
+    final ok = await _confirm(
+      title: 'Share location during this shift?',
+      message: 'Sherize administrators can view your live location and shift location history for up to 30 days. Sharing stops when you end your day or switch it off. Your phone will show a tracking indicator.',
+      confirmLabel: 'Continue',
+    );
+    if (!ok) return;
+    await _run(() async {
+      if (!await _location.requestPermission()) {
+        throw StateError(_location.lastPermissionIssue ??
+            'Location permission is required to share your location.');
+      }
+      await _location.enableConsent();
+      await _location.start();
+      if (mounted) setState(() {});
+    });
+  }
+
+  void _stopLocationWhenSessionInactive(WorkSession session) {
+    if (_stoppingForSessionEnd || !_location.isTracking ||
+        (session.status != WorkStatus.idle && session.status != WorkStatus.ended)) return;
+    _stoppingForSessionEnd = true;
+    _location.stop().whenComplete(() {
+      _stoppingForSessionEnd = false;
+      if (mounted) setState(() {});
+    });
   }
 
   Future<void> _confirmBreak() async {
@@ -170,7 +467,29 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
       message: 'Your break start time will be recorded. The daily goal timer will keep running.',
       confirmLabel: 'Take Break',
     );
-    if (ok) await _run(() => _service.startBreak(widget.uid));
+    if (ok) {
+      await _run(() async {
+        final occurredAt = DateTime.now();
+        final eventLocation = await _captureEventLocation();
+        await _service.startBreak(
+          widget.uid,
+          location: eventLocation,
+          occurredAt: occurredAt,
+        );
+      });
+    }
+  }
+
+  Future<void> _resumeWork() async {
+    await _run(() async {
+      final occurredAt = DateTime.now();
+      final eventLocation = await _captureEventLocation();
+      await _service.resume(
+        widget.uid,
+        location: eventLocation,
+        occurredAt: occurredAt,
+      );
+    });
   }
  
   // ── dialogs / sheets ───────────────────────────────────────
@@ -196,7 +515,22 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
         ],
       ),
     );
-    if (ok == true) await _run(() => _service.endDay(widget.uid));
+    if (ok == true) await _run(() async {
+      final occurredAt = DateTime.now();
+      final eventLocation = await _captureEventLocation();
+      debugPrint('[LocationTracking] Checkout confirmed; stopping location before ending work session.');
+      try {
+        await _location.stop();
+      } catch (error, stackTrace) {
+        debugPrint('[LocationTracking] Local stop failed; proceeding with checkout: $error\n$stackTrace');
+      }
+      if (mounted) setState(() {});
+      await _service.endDay(
+        widget.uid,
+        location: eventLocation,
+        occurredAt: occurredAt,
+      );
+    });
   }
  
   Future<void> _openProgressSheet(WorkSession s) async {
@@ -346,9 +680,13 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
         }
         final s = snap.data ??
             WorkSession.empty(widget.uid, _streamDate);
+        if (snap.connectionState == ConnectionState.active) {
+          _stopLocationWhenSessionInactive(s);
+        }
         final accent = _statusColor(s.status);
         final worked = s.workedAt(_now);
         final onBreak = s.breakAt(_now);
+        final locationSharing = _location.isTracking;
  
         return Container(
           margin: const EdgeInsets.only(bottom: AppSizes.xl),
@@ -391,6 +729,22 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
                     _timeline(s, isDark),
                     const SizedBox(height: 20),
                     _actions(s, worked),
+                    if (s.status == WorkStatus.active || s.status == WorkStatus.onBreak) ...[
+                      const SizedBox(height: 10),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        value: locationSharing,
+                        onChanged: _busy ? null : _toggleLocationSharing,
+                        secondary: Icon(
+                          LucideIcons.mapPin,
+                          color: locationSharing ? AppColors.success : AppColors.textMuted,
+                        ),
+                        title: const Text('Share location during this shift'),
+                        subtitle: Text(locationSharing
+                            ? 'Live sharing is on. Turn off any time.'
+                            : 'Optional. Location sharing ends at checkout.'),
+                      ),
+                    ],
                     if (s.status != WorkStatus.idle) ...[
                       const SizedBox(height: 14),
                       _progressTile(s, isDark),
@@ -711,7 +1065,7 @@ class _DailyProgressCardState extends State<DailyProgressCard> {
                 gradient: AppDecorations.primaryGradient,
                 shadowColor: AppColors.primary,
                 loading: _busy,
-                onTap: () => _run(() => _service.resume(widget.uid)),
+                onTap: _resumeWork,
               ),
             ),
             const SizedBox(width: 10),

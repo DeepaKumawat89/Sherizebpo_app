@@ -45,10 +45,17 @@ exports.resolveEmployeeLogin = functions.https.onCall(async (data, context) => {
             if (snapshot.empty) continue;
 
             for (const document of snapshot.docs) {
-                const user = document.data();
-                const loginEmail = String(user.loginEmail || user.email || "").trim().toLowerCase();
-                if (loginEmail.endsWith(`@${EMPLOYEE_LOGIN_DOMAIN}`)) {
-                    return { loginEmail };
+                // Phone-registered employees keep their verified email as the
+                // Firebase Auth email. Read the canonical Auth record instead
+                // of assuming every account uses the synthetic employee-ID
+                // address; otherwise Firebase checks the correct password
+                // against the wrong account.
+                try {
+                    const userRecord = await admin.auth().getUser(document.id);
+                    const loginEmail = String(userRecord.email || "").trim().toLowerCase();
+                    if (loginEmail) return { loginEmail };
+                } catch (error) {
+                    if (error.code !== "auth/user-not-found") throw error;
                 }
             }
         }

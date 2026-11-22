@@ -1091,12 +1091,19 @@ class _EmployeeSessionCard extends StatelessWidget {
       );
  
   List<_TimelineEntry> _buildEntries() {
+    if (session.events.isNotEmpty) {
+      final eventEntries = _buildEventEntries();
+      if (eventEntries.isNotEmpty) return eventEntries;
+    }
+
+    // Legacy sessions did not expose event data to the model. Keep deriving
+    // their timeline from session and segment timestamps.
     final entries = <_TimelineEntry>[];
     if (session.startedAt != null) {
       entries.add(_TimelineEntry(
         session.startedAt!,
         'Start Day',
-        'Session started',
+        'Session started\nLocation not recorded',
         LucideIcons.play,
         AppColors.success,
       ));
@@ -1107,7 +1114,7 @@ class _EmployeeSessionCard extends StatelessWidget {
       entries.add(_TimelineEntry(
         segment.start,
         'Break $breakNumber started',
-        'Break timer started',
+        'Break timer started\nLocation not recorded',
         LucideIcons.coffee,
         AppColors.warning,
       ));
@@ -1115,7 +1122,8 @@ class _EmployeeSessionCard extends StatelessWidget {
         entries.add(_TimelineEntry(
           segment.end!,
           'Resume Work',
-          'Break $breakNumber lasted ${_duration(segment.duration(referenceTime))}',
+          'Break $breakNumber lasted ${_duration(segment.duration(referenceTime))}'
+              '\nLocation not recorded',
           LucideIcons.zap,
           AppColors.info,
         ));
@@ -1125,13 +1133,94 @@ class _EmployeeSessionCard extends StatelessWidget {
       entries.add(_TimelineEntry(
         session.endedAt!,
         'End Day',
-        'Session completed',
+        'Session completed\nLocation not recorded',
         LucideIcons.flag,
         AppColors.primary,
       ));
     }
     entries.sort((a, b) => a.at.compareTo(b.at));
     return entries;
+  }
+
+  List<_TimelineEntry> _buildEventEntries() {
+    final entries = <_TimelineEntry>[];
+    var breakNumber = 0;
+    for (final event in session.events) {
+      late final String title;
+      late final String detail;
+      late final IconData icon;
+      late final Color color;
+      switch (event.type) {
+        case 'start_day':
+          title = 'Start Day';
+          detail = 'Session started';
+          icon = LucideIcons.play;
+          color = AppColors.success;
+          break;
+        case 'break_start':
+          breakNumber++;
+          title = 'Break $breakNumber started';
+          detail = 'Break timer started';
+          icon = LucideIcons.coffee;
+          color = AppColors.warning;
+          break;
+        case 'break_end':
+          title = 'Resume Work';
+          detail = event.durationSeconds == null
+              ? 'Break ended'
+              : 'Break lasted ${_duration(Duration(seconds: event.durationSeconds!))}';
+          icon = LucideIcons.zap;
+          color = AppColors.info;
+          break;
+        case 'end_day':
+          title = 'End Day';
+          detail = 'Session completed';
+          icon = LucideIcons.flag;
+          color = AppColors.primary;
+          break;
+        default:
+          continue;
+      }
+      entries.add(_TimelineEntry(
+        event.at,
+        title,
+        '$detail\n${_locationDescription(event.location)}',
+        icon,
+        color,
+      ));
+    }
+    entries.sort((a, b) => a.at.compareTo(b.at));
+    return entries;
+  }
+
+  String _locationDescription(AttendanceLocation? location) {
+    if (location == null) return 'Location not recorded';
+    final coordinates =
+        '${location.latitude.toStringAsFixed(6)}, ${location.longitude.toStringAsFixed(6)}';
+    final addressParts = <String>[];
+    for (final part in [
+      location.street,
+      location.locality,
+      location.city,
+      location.state,
+      location.postalCode,
+      location.country,
+    ]) {
+      if (part.isNotEmpty && !addressParts.contains(part)) {
+        addressParts.add(part);
+      }
+    }
+    final displayAddress = location.address.isNotEmpty
+        ? location.address
+        : addressParts.join(', ');
+    if (displayAddress.isNotEmpty) {
+      return '$displayAddress\n$coordinates';
+    }
+    if (location.addressUnavailable) {
+      return 'Address unavailable\n$coordinates';
+    }
+    // Coordinate-only legacy events predate reverse-geocoded addresses.
+    return coordinates;
   }
  
   Widget _timelineTile(

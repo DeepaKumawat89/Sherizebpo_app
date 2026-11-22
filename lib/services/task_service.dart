@@ -1,6 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
-import '../models/task_model.dart';
 import '../core/utils/string_utils.dart';
 
 /// Service handling background fetch and commits connecting to Cloud Firestore
@@ -64,21 +63,6 @@ class TaskService {
           .get();
       if (dup.docs.isEmpty) return code;
     }
-  }
-
-  /// Retrieves a stream of Available Tasks to listen to real-time events.
-  Stream<List<TaskModel>> getAvailableTasks() {
-    return _firestore
-        .collection('tasks')
-        .where('status', isEqualTo: 'active')
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data();
-        data['id'] = doc.id;
-        return TaskModel.fromJson(data);
-      }).toList();
-    });
   }
 
   // ─── Admin: Create Task with Leads ──────────────────────────
@@ -190,53 +174,6 @@ class TaskService {
       }
 
       await batch.commit();
-    }
-  }
-
-  // ─── Worker: Claim Next Lead ──────────────────────────────────
-  /// Assigns a pending lead from a specific campaign to the given [userId].
-  /// Uses a transaction to prevent duplicate claims by multiple workers.
-  Future<String?> claimNextLead({
-    required String campaignId,
-    required String userId,
-  }) async {
-    try {
-      final querySnapshot = await _firestore
-          .collection('campaign_leads')
-          .where('campaignId', isEqualTo: campaignId)
-          .where('status', isEqualTo: 'pending')
-          .limit(1)
-          .get();
-
-      if (querySnapshot.docs.isEmpty) {
-        return null; // No leads available
-      }
-
-      final leadDocRef = querySnapshot.docs.first.reference;
-
-      return await _firestore.runTransaction((transaction) async {
-        final snapshot = await transaction.get(leadDocRef);
-
-        if (!snapshot.exists) {
-          return null;
-        }
-
-        final data = snapshot.data();
-        if (data?['status'] != 'pending' || data?['assignedTo'] != null) {
-          // Lead was already claimed by someone else in the meantime
-          return null; 
-        }
-
-        transaction.update(leadDocRef, {
-          'status': 'in_progress',
-          'assignedTo': userId,
-          'assignedAt': FieldValue.serverTimestamp(),
-        });
-
-        return leadDocRef.id;
-      });
-    } catch (e) {
-      return null;
     }
   }
 }

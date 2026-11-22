@@ -931,3 +931,11 @@ exports.revokeTaskAssignment = revokeTaskAssignment;
 
 const { submitPublicApplication } = require("./auth/submitPublicApplication");
 exports.submitPublicApplication = submitPublicApplication;
+
+// Employee location is written only by the validated server callable.
+const { setLocationConsent, renewLocationConsent, recordEmployeeLocation, purgeOldLocationHistory, stopLocationOnCheckout } = require("./locationTracking");
+exports.setLocationConsent = setLocationConsent;
+exports.renewLocationConsent = renewLocationConsent;
+exports.recordEmployeeLocation = recordEmployeeLocation;
+exports.purgeOldLocationHistory = purgeOldLocationHistory;
+exports.stopLocationOnCheckout = stopLocationOnCheckout;
