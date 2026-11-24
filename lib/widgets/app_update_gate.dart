@@ -5,9 +5,14 @@ import '../services/app_update_service.dart';
 
 class AppUpdateGate extends StatefulWidget {
   const AppUpdateGate(
-      {super.key, required this.child, this.service, this.openStore});
+      {super.key,
+      required this.child,
+      this.loadingChild,
+      this.service,
+      this.openStore});
 
   final Widget child;
+  final Widget? loadingChild;
   final AppUpdateService? service;
   final Future<bool> Function()? openStore;
 
@@ -81,17 +86,20 @@ class _AppUpdateGateState extends State<AppUpdateGate>
                     excluding: blocked,
                     child:
                         IgnorePointer(ignoring: blocked, child: widget.child))),
-            if (blocked)
+            if (!_service.ready)
+              widget.loadingChild ??
+                  const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  )
+            else if (blocked)
               Scaffold(
                 body: SafeArea(
-                    child: Center(
-                        child: SingleChildScrollView(
-                  padding: const EdgeInsets.all(24),
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: 400),
-                    child: !_service.ready
-                        ? const Center(child: CircularProgressIndicator())
-                        : Column(
+                  child: Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(24),
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 400),
+                        child: Column(
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -148,8 +156,10 @@ class _AppUpdateGateState extends State<AppUpdateGate>
                                               .colorScheme
                                               .error)),
                               ]),
+                      ),
+                    ),
                   ),
-                ))),
+                ),
               ),
           ]);
         },

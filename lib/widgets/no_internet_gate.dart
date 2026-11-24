@@ -8,14 +8,20 @@ import '../services/network_connectivity_service.dart';
 /// Keeps the current navigator mounted and covers it only while internet
 /// access is unavailable. This preserves auth state, routes, and cached data.
 class NoInternetGate extends StatelessWidget {
-  const NoInternetGate({super.key, required this.child});
+  const NoInternetGate({
+    super.key,
+    required this.child,
+    this.startupChild,
+  });
 
   final Widget child;
+  final Widget? startupChild;
 
   @override
   Widget build(BuildContext context) {
     final network = context.watch<NetworkConnectivityService>();
     final blocked = network.status != InternetStatus.online;
+    final initialCheck = network.status == InternetStatus.checking;
 
     return Stack(
       fit: StackFit.expand,
@@ -27,9 +33,10 @@ class NoInternetGate extends StatelessWidget {
             child: IgnorePointer(ignoring: blocked, child: child),
           ),
         ),
-        if (blocked)
+        if (initialCheck)
+          startupChild ?? child
+        else if (network.isOffline)
           _NoInternetScreen(
-            initialCheck: network.status == InternetStatus.checking,
             checking: network.isChecking,
             onRetry: network.checkNow,
           ),
@@ -40,12 +47,10 @@ class NoInternetGate extends StatelessWidget {
 
 class _NoInternetScreen extends StatelessWidget {
   const _NoInternetScreen({
-    required this.initialCheck,
     required this.checking,
     required this.onRetry,
   });
 
-  final bool initialCheck;
   final bool checking;
   final Future<void> Function() onRetry;
 
@@ -90,9 +95,7 @@ class _NoInternetScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 32),
                       Text(
-                        initialCheck
-                            ? 'Checking your connection...'
-                            : 'No Internet Connection',
+                        'No Internet Connection',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                               color: AppColors.textDark,
@@ -101,9 +104,7 @@ class _NoInternetScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        initialCheck
-                            ? 'Please wait while Sherize reconnects.'
-                            : 'Sherize will reconnect automatically. Check your Wi-Fi or mobile data, then try again.',
+                        'Sherize will reconnect automatically. Check your Wi-Fi or mobile data, then try again.',
                         textAlign: TextAlign.center,
                         style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                               color: AppColors.textMuted,

@@ -235,23 +235,27 @@ class _SherizeAppState extends State<SherizeApp> with WidgetsBindingObserver {
                 !routingState.developer;
 
             return NoInternetGate(
-              child: AppUpdateGate(child: Stack(
-                children: [
-                  if (child != null)
-                    (shouldBlock ? const MaintenanceOverlay() : child),
-                  if (isLocked)
-                    HeroControllerScope.none(
-                      child: Navigator(
-                        onGenerateRoute: (_) => MaterialPageRoute<void>(
-                          builder: (_) => PasscodeScreen(
-                            mode: PasscodeMode.lock,
-                            navigatorKey: navigatorKey,
+              startupChild: const _SplashScreen(),
+              child: AppUpdateGate(
+                loadingChild: const _SplashScreen(),
+                child: Stack(
+                  children: [
+                    if (child != null)
+                      (shouldBlock ? const MaintenanceOverlay() : child),
+                    if (isLocked)
+                      HeroControllerScope.none(
+                        child: Navigator(
+                          onGenerateRoute: (_) => MaterialPageRoute<void>(
+                            builder: (_) => PasscodeScreen(
+                              mode: PasscodeMode.lock,
+                              navigatorKey: navigatorKey,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                ],
-              )),
+                  ],
+                ),
+              ),
             );
           },
         );
@@ -261,9 +265,8 @@ class _SherizeAppState extends State<SherizeApp> with WidgetsBindingObserver {
   /// Returns the correct initial screen based on auth state.
   ///
   /// Priority:
-  ///  1. Authenticated user  → /verify-gate (skips onboarding & login entirely)
-  ///  2. Unauthenticated, onboarding not done → /onboarding
-  ///  3. Unauthenticated, onboarding done     → /login
+  ///  1. Authenticated users go directly to their respective dashboard.
+  ///  2. Unauthenticated users go directly to login.
   Widget _buildInitialScreen(
     AuthService auth,
     ({
@@ -302,10 +305,7 @@ class _SherizeAppState extends State<SherizeApp> with WidgetsBindingObserver {
       }
       return const _RouteRedirect(route: '/dashboard');
     }
-    // Unauthenticated visitors see the onboarding intro first, then land on the
-    // public job openings page (no OTP / phone / email). Hired workers log in
-    // from there with their Employee ID + password, or "Login with mobile number".
-    return const _RouteRedirect(route: AppRoutes.onboarding);
+    return const _RouteRedirect(route: AppRoutes.login);
   }
 }
 
@@ -337,32 +337,35 @@ class _RouteRedirectState extends State<_RouteRedirect> {
   }
 }
 
-/// Minimal splash screen shown while the Firebase auth session is being restored.
+/// Branded splash shown while startup and route resolution complete.
 class _SplashScreen extends StatelessWidget {
   const _SplashScreen();
 
   @override
   Widget build(BuildContext context) {
-    return const Scaffold(
+    return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            Expanded(
-              child: Center(
-                child: CircularProgressIndicator(
-                  color: AppColors.primary,
-                  strokeWidth: 2.5,
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 48),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 220),
+                  child: Image.asset(
+                    'assets/images/sherize_logo.png',
+                    fit: BoxFit.contain,
+                    semanticLabel: 'Sherize',
+                  ),
                 ),
               ),
             ),
-            Expanded(
-              child: Align(
-                alignment: Alignment.bottomCenter,
-                child: Padding(
-                  padding: EdgeInsets.only(bottom: 32),
-                  child: DeveloperCredit(),
-                ),
+            const Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: EdgeInsets.fromLTRB(24, 16, 24, 32),
+                child: DeveloperCredit(),
               ),
             ),
           ],
