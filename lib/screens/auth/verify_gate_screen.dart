@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/constants.dart';
 import '../../routes.dart';
+import '../../services/network_connectivity_service.dart';
 import '../../services/verification_service.dart';
 
 /// Central post-login checkpoint.
@@ -24,6 +26,8 @@ class VerifyGateScreen extends StatefulWidget {
 class _VerifyGateScreenState extends State<VerifyGateScreen> {
   final _verificationService = VerificationService();
   String? _error;
+  bool _wasOffline = false;
+  bool _running = false;
 
   @override
   void initState() {
@@ -32,7 +36,22 @@ class _VerifyGateScreenState extends State<VerifyGateScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _runGate());
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isOffline = context.watch<NetworkConnectivityService>().isOffline;
+    if (_wasOffline && !isOffline && _error != null && !_running) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _runGate();
+      });
+    }
+    _wasOffline = isOffline;
+  }
+
   Future<void> _runGate() async {
+    if (_running) return;
+    _running = true;
+    if (_error != null && mounted) setState(() => _error = null);
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) {
       // Not authenticated at all — go back to login
@@ -42,6 +61,7 @@ class _VerifyGateScreenState extends State<VerifyGateScreen> {
         AppRoutes.login,
         (_) => false,
       );
+      _running = false;
       return;
     }
 
@@ -68,6 +88,8 @@ class _VerifyGateScreenState extends State<VerifyGateScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = 'Could not verify account status. Tap retry.');
+    } finally {
+      _running = false;
     }
   }
 

@@ -8,7 +8,6 @@ import '../../core/constants/constants.dart';
 import '../../services/auth_service.dart';
 import '../../routes.dart';
 import 'widgets/admin_work_session_monitor.dart';
-import '../admin/admin_live_location_screen.dart';
  
 /// Admin Dashboard Screen — Role-aware, task-reviewer focused.
 class AdminDashboardScreen extends StatefulWidget {
@@ -429,20 +428,6 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                         onTap: () => Navigator.of(context).push(
                           MaterialPageRoute<void>(
                             builder: (_) => AdminWorkSessionScreen(
-                              firestore: _firestore,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: AppSizes.sm),
-                      _ActionTile(
-                        icon: LucideIcons.mapPin,
-                        title: 'Live Employee Locations',
-                        subtitle: 'View opted-in locations and shift history',
-                        color: AppColors.success,
-                        onTap: () => Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => AdminLiveLocationScreen(
                               firestore: _firestore,
                             ),
                           ),

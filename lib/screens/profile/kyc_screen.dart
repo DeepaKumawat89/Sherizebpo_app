@@ -6,6 +6,7 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
  
 import '../../core/constants/constants.dart';
 import '../../core/utils/snackbar_utils.dart';
@@ -19,6 +20,8 @@ class KycScreen extends StatefulWidget {
 }
  
 class _KycScreenState extends State<KycScreen> {
+  static const int _maxKycImageBytes = 8 * 1024 * 1024;
+  static const String _pendingImageTypeKey = 'pending_kyc_image_type';
   final ImagePicker _picker = ImagePicker();
  
   XFile? _profilePhoto;
@@ -30,9 +33,17 @@ class _KycScreenState extends State<KycScreen> {
   Uint8List? _panBytes;
  
   bool _isSubmitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _recoverLostImage();
+  }
  
   Future<void> _pickImage(String type) async {
     try {
+      final preferences = await SharedPreferences.getInstance();
+      await preferences.setString(_pendingImageTypeKey, type);
       final XFile? image = await _picker.pickImage(
         source: ImageSource.gallery,
         maxWidth: 1920,
@@ -40,25 +51,55 @@ class _KycScreenState extends State<KycScreen> {
         imageQuality: 70,
       );
  
-      if (image != null) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          if (type == 'profile') {
-            _profilePhoto = image;
-            _profileBytes = bytes;
-          } else if (type == 'aadhaar') {
-            _aadhaarPhoto = image;
-            _aadhaarBytes = bytes;
-          } else if (type == 'pan') {
-            _panPhoto = image;
-            _panBytes = bytes;
-          }
-        });
-      }
+      if (image != null) await _acceptImage(type, image);
+      await preferences.remove(_pendingImageTypeKey);
     } catch (e) {
       if (!mounted) return;
       SnackBarUtils.showError('Failed to pick image: $e');
     }
+  }
+
+  Future<void> _recoverLostImage() async {
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final type = preferences.getString(_pendingImageTypeKey);
+      final response = await _picker.retrieveLostData();
+      await preferences.remove(_pendingImageTypeKey);
+      if (response.isEmpty) return;
+      if (response.exception != null) throw response.exception!;
+      final files = response.files;
+      if (type != null && files != null && files.isNotEmpty) {
+        await _acceptImage(type, files.first);
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtils.showError('Could not recover the selected KYC image: $e');
+      }
+    }
+  }
+
+  Future<void> _acceptImage(String type, XFile image) async {
+    final length = await image.length();
+    if (length <= 0 || length > _maxKycImageBytes) {
+      if (mounted) {
+        SnackBarUtils.showError('Choose an image smaller than 8 MB.');
+      }
+      return;
+    }
+    final bytes = await image.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      if (type == 'profile') {
+        _profilePhoto = image;
+        _profileBytes = bytes;
+      } else if (type == 'aadhaar') {
+        _aadhaarPhoto = image;
+        _aadhaarBytes = bytes;
+      } else if (type == 'pan') {
+        _panPhoto = image;
+        _panBytes = bytes;
+      }
+    });
   }
  
   Future<void> _submitKyc() async {
@@ -89,17 +130,16 @@ class _KycScreenState extends State<KycScreen> {
  
       final storage = FirebaseStorage.instance;
  
-      Future<String> uploadFile(XFile file, String type) async {
+      Future<String> uploadFile(Uint8List bytes, String type) async {
         final ref = storage.ref().child('kyc/${user.uid}/$type.jpg');
-        final bytes = await file.readAsBytes();
         final metadata = SettableMetadata(contentType: 'image/jpeg');
         final uploadTask = await ref.putData(bytes, metadata);
         return uploadTask.ref.getDownloadURL();
       }
  
-      final profileUrl = await uploadFile(_profilePhoto!, 'profile');
-      final aadhaarUrl = await uploadFile(_aadhaarPhoto!, 'aadhaar');
-      final panUrl = await uploadFile(_panPhoto!, 'pan');
+      final profileUrl = await uploadFile(_profileBytes!, 'profile');
+      final aadhaarUrl = await uploadFile(_aadhaarBytes!, 'aadhaar');
+      final panUrl = await uploadFile(_panBytes!, 'pan');
  
       await FirebaseFirestore.instance
           .collection('users')
@@ -629,6 +669,8 @@ class _KycScreenState extends State<KycScreen> {
                                       width: 68,
                                       height: 68,
                                       fit: BoxFit.cover,
+                                      cacheWidth: 136,
+                                      cacheHeight: 136,
                                     )
                                   : Image.network(
                                       networkUrl!,

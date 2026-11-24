@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as flutter;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -14,6 +15,7 @@ import '../../core/constants/constants.dart';
 import '../../services/task_service.dart';
 import '../../services/platform_settings_service.dart';
 import '../../core/utils/snackbar_utils.dart';
+import '../../core/utils/lead_sheet_file_access.dart';
 import '../../routes.dart';
  
 /// Admin Task Creation Screen.
@@ -28,6 +30,7 @@ class AdminCreateTaskScreen extends StatefulWidget {
 }
  
 class _AdminCreateTaskScreenState extends State<AdminCreateTaskScreen> {
+  static const int _maxLeadSheetBytes = 10 * 1024 * 1024;
   final _formKey = GlobalKey<FormState>();
   final _taskService = TaskService();
  
@@ -89,17 +92,18 @@ class _AdminCreateTaskScreenState extends State<AdminCreateTaskScreen> {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['csv', 'xlsx', 'xls'],
-        withData: true,
+        // Browsers do not expose a native path. Android uploads directly from
+        // the picked file and only reads it once later for parsing.
+        withData: kIsWeb,
       );
  
       if (result == null || result.files.isEmpty) return;
  
       final file = result.files.first;
-      final fileBytes = file.bytes;
       final fileName = file.name;
  
-      if (fileBytes == null) {
-        _showError('Unable to read file content.');
+      if (file.size <= 0 || file.size > _maxLeadSheetBytes) {
+        _showError('Choose a lead sheet smaller than 10 MB.');
         return;
       }
  
@@ -117,13 +121,16 @@ class _AdminCreateTaskScreenState extends State<AdminCreateTaskScreen> {
           .child(leadOwnerId)
           .child(fileName);
  
-      final uploadTask = storageRef.putData(
-        fileBytes,
+      final uploadTask = uploadLeadSheetFile(
+        storageRef,
+        file,
         SettableMetadata(contentType: 'application/octet-stream'),
       );
  
       uploadTask.snapshotEvents.listen((event) {
-        final progress = event.bytesTransferred / event.totalBytes;
+        final progress = event.totalBytes == 0
+            ? 0.0
+            : event.bytesTransferred / event.totalBytes;
         if (mounted) {
           setState(() {
             _uploadProgress = progress;
@@ -142,6 +149,9 @@ class _AdminCreateTaskScreenState extends State<AdminCreateTaskScreen> {
       }
  
       List<Map<String, String>> newLeads = [];
+      // Parsing libraries require bytes, so load one bounded buffer only after
+      // the native file upload has completed. This avoids duplicate copies.
+      final fileBytes = await readLeadSheetBytes(file);
  
       if (fileName.toLowerCase().endsWith('.csv')) {
         final csvString = utf8.decode(fileBytes);

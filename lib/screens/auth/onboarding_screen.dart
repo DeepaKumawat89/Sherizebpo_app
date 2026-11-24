@@ -354,12 +354,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                                   borderRadius:
                                       BorderRadius.circular(AppSizes.radiusLg),
                                   onTap: () => Navigator.of(context)
-                                      .pushReplacementNamed(
-                                        AppRoutes.login,
-                                        arguments: const {
-                                          'showJobPopup': true,
-                                        },
-                                      ),
+                                      .pushReplacementNamed(AppRoutes.login),
                                   child: const Row(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [

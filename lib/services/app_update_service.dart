@@ -94,6 +94,7 @@ class AppUpdateService extends ChangeNotifier {
     _started = true;
     if (!_supported) {
       _ready = true;
+      notifyListeners();
       return;
     }
     try {

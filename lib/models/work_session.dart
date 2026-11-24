@@ -75,6 +75,7 @@ class AttendanceLocation {
   final String address;
   final String street;
   final String locality;
+  String get area => locality;
   final String city;
   final String state;
   final String postalCode;
@@ -105,7 +106,7 @@ class AttendanceLocation {
       capturedAt: capturedAt is Timestamp ? capturedAt.toDate() : null,
       address: (map['address'] ?? '').toString(),
       street: (map['street'] ?? '').toString(),
-      locality: (map['locality'] ?? '').toString(),
+      locality: (map['area'] ?? map['locality'] ?? '').toString(),
       city: (map['city'] ?? '').toString(),
       state: (map['state'] ?? '').toString(),
       postalCode: (map['postalCode'] ?? '').toString(),
@@ -122,6 +123,7 @@ class AttendanceLocation {
         if (address.isNotEmpty) 'address': address,
         if (street.isNotEmpty) 'street': street,
         if (locality.isNotEmpty) 'locality': locality,
+        if (locality.isNotEmpty) 'area': locality,
         if (city.isNotEmpty) 'city': city,
         if (state.isNotEmpty) 'state': state,
         if (postalCode.isNotEmpty) 'postalCode': postalCode,

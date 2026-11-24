@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/constants.dart';
 import '../../services/auth_service.dart';
 import '../../routes.dart';
+import '../jobs/job_banner_popup.dart';
+import '../jobs/public_jobs_screen.dart';
  
 /// Production-ready Admin Login Screen.
 ///
@@ -46,9 +50,43 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
   bool _obscurePassword = true;
   bool _isLoading = false;
   String? _errorMessage;
+  Timer? _jobPopupTimer;
+  bool _jobPopupShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleJobPopup();
+  }
+
+  void _scheduleJobPopup([Duration delay = const Duration(seconds: 5)]) {
+    _jobPopupTimer?.cancel();
+    _jobPopupTimer = Timer(delay, () {
+      if (!mounted || _jobPopupShown ||
+          ModalRoute.of(context)?.isCurrent != true) return;
+      if (_isLoading) {
+        _scheduleJobPopup(const Duration(seconds: 1));
+        return;
+      }
+      _jobPopupShown = true;
+      unawaited(_showJobPopup());
+    });
+  }
+
+  Future<void> _showJobPopup() async {
+    if (!mounted) return;
+    final selectedJob = await showJobBannerPopup(context);
+    if (!mounted || selectedJob == null) return;
+    await showPublicJobApplicationSheet(
+      context,
+      jobId: selectedJob.id,
+      jobTitle: selectedJob.title,
+    );
+  }
  
   @override
   void dispose() {
+    _jobPopupTimer?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();

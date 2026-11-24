@@ -1,10 +1,9 @@
 // lib/widgets/daily_progress_card.dart
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:ui' show FontFeature;
  
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:human_bpo/core/constants/app_colors.dart';
@@ -13,7 +12,6 @@ import 'package:human_bpo/core/theme/app_decorations.dart';
 import 'package:human_bpo/models/work_session.dart';
 import 'package:human_bpo/services/attendance_location_service.dart';
 import 'package:human_bpo/services/work_session_service.dart';
-import 'package:human_bpo/services/employee_location_service.dart';
 import 'package:lucide_icons/lucide_icons.dart';
  
 // Semantic colours for the session states.
@@ -40,15 +38,11 @@ class _DailyProgressCardState extends State<DailyProgressCard>
     with WidgetsBindingObserver {
   final _service = WorkSessionService();
   final _attendanceLocation = AttendanceLocationService();
-  final _location = EmployeeLocationService.instance;
   late Stream<WorkSession> _stream;
   late String _streamDate;
   Timer? _ticker;
-  DateTime _now = DateTime.now();
+  final ValueNotifier<DateTime> _clock = ValueNotifier<DateTime>(DateTime.now());
   bool _busy = false;
-  bool _stoppingForSessionEnd = false;
-  bool _hadLocationReadinessIssue = false;
-  Future<void>? _locationReadinessCheck;
  
   @override
   void initState() {
@@ -56,107 +50,52 @@ class _DailyProgressCardState extends State<DailyProgressCard>
     WidgetsBinding.instance.addObserver(this);
     _streamDate = WorkSessionService.todayKey();
     _stream = _service.watchToday(widget.uid);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) unawaited(_checkLocationReadiness());
-    });
-    // Repaint only. Real time is derived from timestamps, so it is safe
-    // if the app is backgrounded or killed.
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted) return;
-      final now = DateTime.now();
-      final date = WorkSessionService.todayKey(now);
-      if (date != _streamDate) {
-        setState(() {
-          _now = now;
-          _streamDate = date;
-          _stream = _service.watchToday(widget.uid);
-        });
-      } else {
-        setState(() => _now = now);
-      }
-    });
+    _startTicker();
+  }
+
+  void _startTicker() {
+    _ticker?.cancel();
+    _tickClock();
+    _ticker = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => _tickClock(),
+    );
+  }
+
+  void _tickClock() {
+    if (!mounted) return;
+    final now = DateTime.now();
+    final date = WorkSessionService.todayKey(now);
+    _clock.value = now;
+    if (date != _streamDate) {
+      setState(() {
+        _streamDate = date;
+        _stream = _service.watchToday(widget.uid);
+      });
+    }
   }
  
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _ticker?.cancel();
+    _clock.dispose();
     _attendanceLocation.close();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) return;
-    () async {
-      await _checkLocationReadiness();
-      if (!_location.isTracking) return;
-      final permission = await Geolocator.checkPermission();
-      final enabled = await Geolocator.isLocationServiceEnabled();
-      debugPrint('[LocationTracking] App resumed; permission=$permission, device location enabled=$enabled.');
-      if (!enabled || permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever ||
-          (defaultTargetPlatform == TargetPlatform.iOS &&
-              permission == LocationPermission.whileInUse)) {
-        await _location.stop();
-        if (mounted) setState(() {});
+    if (state != AppLifecycleState.resumed) {
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.detached ||
+          state == AppLifecycleState.hidden) {
+        _ticker?.cancel();
+        _ticker = null;
       }
-    }();
-  }
-
-  Future<void> _checkLocationReadiness() {
-    final inProgress = _locationReadinessCheck;
-    if (inProgress != null) return inProgress;
-
-    final check = _performLocationReadinessCheck();
-    _locationReadinessCheck = check;
-    unawaited(check.whenComplete(() {
-      if (identical(_locationReadinessCheck, check)) {
-        _locationReadinessCheck = null;
-      }
-    }));
-    return check;
-  }
-
-  Future<void> _performLocationReadinessCheck() async {
-    try {
-      await _attendanceLocation.ensureForegroundReady();
-      if (_hadLocationReadinessIssue && mounted) {
-        _hadLocationReadinessIssue = false;
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Location is ready. You can check in now.'),
-        ));
-      }
-    } on AttendanceLocationException catch (error) {
-      _hadLocationReadinessIssue = true;
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(
-            '${error.message} Return to Sherize after updating it; location will be checked again.',
-          ),
-          action: error.settingsAvailable
-              ? SnackBarAction(
-                  label: 'Settings',
-                  onPressed: error.openDeviceSettings
-                      ? Geolocator.openLocationSettings
-                      : Geolocator.openAppSettings,
-                )
-              : null,
-        ));
-      }
-    } catch (error, stackTrace) {
-      _hadLocationReadinessIssue = true;
-      debugPrint(
-        '[AttendanceLocation] Startup readiness check failed: $error\n$stackTrace',
-      );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-            'Location readiness could not be checked. Check GPS and permission before trying Check In.',
-          ),
-        ));
-      }
+      return;
     }
+    _startTicker();
   }
  
   // ── helpers ────────────────────────────────────────────────
@@ -167,16 +106,10 @@ class _DailyProgressCardState extends State<DailyProgressCard>
     try {
       await action();
     } catch (e) {
-      debugPrint('[LocationTracking] Shift/location action failed: $e');
+      debugPrint('[Attendance] Action failed: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('Could not update: $e'),
-          action: _location.lastPermissionIssue == null
-              ? null
-              : SnackBarAction(
-                  label: 'Settings',
-                  onPressed: _openLocationSettings,
-                ),
         ));
       }
     } finally {
@@ -196,7 +129,7 @@ class _DailyProgressCardState extends State<DailyProgressCard>
     return '${d.inMinutes}m';
   }
  
-  String _clock(DateTime? t) {
+  String _formatClock(DateTime? t) {
     if (t == null) return '--';
     final h12 = t.hour % 12 == 0 ? 12 : t.hour % 12;
     final m = t.minute.toString().padLeft(2, '0');
@@ -253,7 +186,9 @@ class _DailyProgressCardState extends State<DailyProgressCard>
         false;
   }
 
-  Future<AttendanceLocation?> _captureEventLocation() async {
+  Future<AttendanceLocation?> _captureRequiredEventLocation(
+    String actionLabel,
+  ) async {
     try {
       final location = await _attendanceLocation.capture();
       if (location.addressUnavailable && mounted) {
@@ -268,7 +203,7 @@ class _DailyProgressCardState extends State<DailyProgressCard>
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-            '${error.message} The attendance action will continue without a location.',
+            '${error.message} $actionLabel was not saved. Please retry.',
           ),
           action: error.settingsAvailable
               ? SnackBarAction(
@@ -283,9 +218,9 @@ class _DailyProgressCardState extends State<DailyProgressCard>
       return null;
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text(
-            'A fresh location could not be obtained. The attendance action will continue without a location.',
+            'A fresh location could not be obtained. $actionLabel was not saved. Check GPS and retry.',
           ),
         ));
       }
@@ -294,14 +229,10 @@ class _DailyProgressCardState extends State<DailyProgressCard>
   }
 
   Future<AttendanceLocation?> _captureRequiredCheckInLocation() async {
-    final startupCheck = _locationReadinessCheck;
-    if (startupCheck != null) await startupCheck;
     try {
       final location = await _attendanceLocation.capture();
-      _hadLocationReadinessIssue = false;
       return location;
     } on AttendanceLocationException catch (error) {
-      _hadLocationReadinessIssue = true;
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: Text('${error.message} Check-in was not saved. Please retry.'),
@@ -332,21 +263,13 @@ class _DailyProgressCardState extends State<DailyProgressCard>
   }
 
   Future<void> _confirmStart() async {
-    final share = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Start your day?'),
-        content: const Text(
-          'Your current location will be requested for this check-in. You may also choose to share live location with Sherize administrators during this active session. Live sharing is optional, uses background location while enabled, and stops when you end the day or turn it off. A limited shift history is retained for up to 30 days.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Start without sharing')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Allow and Start')),
-        ],
-      ),
+    final confirmed = await _confirm(
+      title: 'Start your day?',
+      message:
+          'Your current location and address will be captured and saved for this check-in.',
+      confirmLabel: 'Check In',
     );
-    if (share == null) return;
-    debugPrint('[LocationTracking] Employee confirmed shift start; location consent=$share.');
+    if (!confirmed) return;
     await _run(() async {
       final occurredAt = DateTime.now();
       final eventLocation = await _captureRequiredCheckInLocation();
@@ -368,7 +291,7 @@ class _DailyProgressCardState extends State<DailyProgressCard>
         }
         return;
       }
-      debugPrint('[LocationTracking] Work session started.');
+      debugPrint('[AttendanceLocation] Work session started.');
       if (mounted) {
         final message = eventLocation.addressUnavailable
             ? 'Checked in successfully. Coordinates saved; address unavailable.'
@@ -377,87 +300,6 @@ class _DailyProgressCardState extends State<DailyProgressCard>
           SnackBar(content: Text(message)),
         );
       }
-      if (!share) return;
-
-      var permission = false;
-      try {
-        permission = await _location.requestPermission();
-      } catch (error, stackTrace) {
-        _location.lastPermissionIssue = 'Location permission could not be checked.';
-        debugPrint('[LocationTracking] Permission check failed; shift remains active: $error\n$stackTrace');
-      }
-      debugPrint('[LocationTracking] Shift start permission ready=$permission.');
-      if (!permission) {
-        final issue = _location.lastPermissionIssue ?? 'Location permission was not granted.';
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('$issue Your shift started without location sharing.'),
-            action: SnackBarAction(
-              label: 'Settings',
-              onPressed: _openLocationSettings,
-            ),
-          ));
-        }
-        return;
-      }
-      try {
-        await _location.enableConsent();
-        await _location.start();
-        if (mounted) setState(() {});
-      } catch (error, stackTrace) {
-        debugPrint(
-          '[LocationTracking] Check-in saved but live sharing failed: $error\n$stackTrace',
-        );
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-              'Check-in was saved, but live location sharing could not start.',
-            ),
-          ));
-        }
-      }
-    });
-  }
-
-  void _openLocationSettings() {
-    final issue = _location.lastPermissionIssue ?? '';
-    if (issue.startsWith('Turn on device Location')) {
-      Geolocator.openLocationSettings();
-    } else {
-      Geolocator.openAppSettings();
-    }
-  }
-
-  Future<void> _toggleLocationSharing(bool enabled) async {
-    if (!enabled) {
-      await _location.stop();
-      if (mounted) setState(() {});
-      return;
-    }
-    final ok = await _confirm(
-      title: 'Share location during this shift?',
-      message: 'Sherize administrators can view your live location and shift location history for up to 30 days. Sharing stops when you end your day or switch it off. Your phone will show a tracking indicator.',
-      confirmLabel: 'Continue',
-    );
-    if (!ok) return;
-    await _run(() async {
-      if (!await _location.requestPermission()) {
-        throw StateError(_location.lastPermissionIssue ??
-            'Location permission is required to share your location.');
-      }
-      await _location.enableConsent();
-      await _location.start();
-      if (mounted) setState(() {});
-    });
-  }
-
-  void _stopLocationWhenSessionInactive(WorkSession session) {
-    if (_stoppingForSessionEnd || !_location.isTracking ||
-        (session.status != WorkStatus.idle && session.status != WorkStatus.ended)) return;
-    _stoppingForSessionEnd = true;
-    _location.stop().whenComplete(() {
-      _stoppingForSessionEnd = false;
-      if (mounted) setState(() {});
     });
   }
 
@@ -470,7 +312,9 @@ class _DailyProgressCardState extends State<DailyProgressCard>
     if (ok) {
       await _run(() async {
         final occurredAt = DateTime.now();
-        final eventLocation = await _captureEventLocation();
+        final eventLocation =
+            await _captureRequiredEventLocation('Break start');
+        if (eventLocation == null) return;
         await _service.startBreak(
           widget.uid,
           location: eventLocation,
@@ -483,7 +327,8 @@ class _DailyProgressCardState extends State<DailyProgressCard>
   Future<void> _resumeWork() async {
     await _run(() async {
       final occurredAt = DateTime.now();
-      final eventLocation = await _captureEventLocation();
+      final eventLocation = await _captureRequiredEventLocation('Resume');
+      if (eventLocation == null) return;
       await _service.resume(
         widget.uid,
         location: eventLocation,
@@ -515,22 +360,18 @@ class _DailyProgressCardState extends State<DailyProgressCard>
         ],
       ),
     );
-    if (ok == true) await _run(() async {
-      final occurredAt = DateTime.now();
-      final eventLocation = await _captureEventLocation();
-      debugPrint('[LocationTracking] Checkout confirmed; stopping location before ending work session.');
-      try {
-        await _location.stop();
-      } catch (error, stackTrace) {
-        debugPrint('[LocationTracking] Local stop failed; proceeding with checkout: $error\n$stackTrace');
-      }
-      if (mounted) setState(() {});
-      await _service.endDay(
-        widget.uid,
-        location: eventLocation,
-        occurredAt: occurredAt,
-      );
-    });
+    if (ok == true) {
+      await _run(() async {
+        final occurredAt = DateTime.now();
+        final eventLocation = await _captureRequiredEventLocation('Check-out');
+        if (eventLocation == null) return;
+        await _service.endDay(
+          widget.uid,
+          location: eventLocation,
+          occurredAt: occurredAt,
+        );
+      });
+    }
   }
  
   Future<void> _openProgressSheet(WorkSession s) async {
@@ -680,13 +521,7 @@ class _DailyProgressCardState extends State<DailyProgressCard>
         }
         final s = snap.data ??
             WorkSession.empty(widget.uid, _streamDate);
-        if (snap.connectionState == ConnectionState.active) {
-          _stopLocationWhenSessionInactive(s);
-        }
         final accent = _statusColor(s.status);
-        final worked = s.workedAt(_now);
-        final onBreak = s.breakAt(_now);
-        final locationSharing = _location.isTracking;
  
         return Container(
           margin: const EdgeInsets.only(bottom: AppSizes.xl),
@@ -724,27 +559,20 @@ class _DailyProgressCardState extends State<DailyProgressCard>
                   children: [
                     _header(s, accent, isDark),
                     const SizedBox(height: 18),
-                    _hero(s, worked, onBreak, isDark),
+                    _timeDependent(
+                      s,
+                      (now) => _hero(s, now, isDark),
+                    ),
                     const SizedBox(height: 20),
-                    _timeline(s, isDark),
+                    _timeDependent(
+                      s,
+                      (now) => _timeline(s, now, isDark),
+                    ),
                     const SizedBox(height: 20),
-                    _actions(s, worked),
-                    if (s.status == WorkStatus.active || s.status == WorkStatus.onBreak) ...[
-                      const SizedBox(height: 10),
-                      SwitchListTile.adaptive(
-                        contentPadding: EdgeInsets.zero,
-                        value: locationSharing,
-                        onChanged: _busy ? null : _toggleLocationSharing,
-                        secondary: Icon(
-                          LucideIcons.mapPin,
-                          color: locationSharing ? AppColors.success : AppColors.textMuted,
-                        ),
-                        title: const Text('Share location during this shift'),
-                        subtitle: Text(locationSharing
-                            ? 'Live sharing is on. Turn off any time.'
-                            : 'Optional. Location sharing ends at checkout.'),
-                      ),
-                    ],
+                    _actions(
+                      s,
+                      s.workedAt(s.endedAt ?? _clock.value),
+                    ),
                     if (s.status != WorkStatus.idle) ...[
                       const SizedBox(height: 14),
                       _progressTile(s, isDark),
@@ -756,6 +584,19 @@ class _DailyProgressCardState extends State<DailyProgressCard>
           ),
         );
       },
+    );
+  }
+
+  Widget _timeDependent(
+    WorkSession session,
+    Widget Function(DateTime now) builder,
+  ) {
+    final isLive = session.status == WorkStatus.active ||
+        session.status == WorkStatus.onBreak;
+    if (!isLive) return builder(_clock.value);
+    return ValueListenableBuilder<DateTime>(
+      valueListenable: _clock,
+      builder: (_, now, __) => builder(now),
     );
   }
 
@@ -813,7 +654,7 @@ class _DailyProgressCardState extends State<DailyProgressCard>
               ),
               const SizedBox(height: 2),
               Text(
-                _dateLabel(_now),
+                _dateLabel(_clock.value),
                 style: theme.textTheme.labelSmall?.copyWith(
                   color: isDark ? Colors.white54 : AppColors.textMuted,
                 ),
@@ -826,9 +667,11 @@ class _DailyProgressCardState extends State<DailyProgressCard>
     );
   }
  
-  Widget _hero(WorkSession s, Duration worked, Duration onBreak, bool isDark) {
+  Widget _hero(WorkSession s, DateTime now, bool isDark) {
     final goal = Duration(hours: widget.targetHours);
-    final elapsed = s.sessionAt(_now);
+    final elapsed = s.sessionAt(now);
+    final worked = s.workedAt(now);
+    final onBreak = s.breakAt(now);
     final progress = (elapsed.inSeconds / goal.inSeconds).clamp(0.0, 1.0);
     final goalReached = elapsed >= goal;
     final textMain = isDark ? Colors.white : AppColors.textDark;
@@ -857,14 +700,16 @@ class _DailyProgressCardState extends State<DailyProgressCard>
             child: Stack(
               alignment: Alignment.center,
               children: [
-                CustomPaint(
-                  size: Size.square(ring),
-                  painter: _RingPainter(
-                    progress: progress,
-                    colors: ringColors,
-                    trackColor: isDark
-                        ? Colors.white.withValues(alpha: 0.09)
-                        : Colors.black.withValues(alpha: 0.06),
+                RepaintBoundary(
+                  child: CustomPaint(
+                    size: Size.square(ring),
+                    painter: _RingPainter(
+                      progress: progress,
+                      colors: ringColors,
+                      trackColor: isDark
+                          ? Colors.white.withValues(alpha: 0.09)
+                          : Colors.black.withValues(alpha: 0.06),
+                    ),
                   ),
                 ),
                 Column(
@@ -882,12 +727,12 @@ class _DailyProgressCardState extends State<DailyProgressCard>
                     ),
                     const SizedBox(height: 3),
                     goalReached
-                        ? Row(
+                        ? const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(LucideIcons.checkCircle,
+                              Icon(LucideIcons.checkCircle,
                                   size: 12, color: _kDone),
-                              const SizedBox(width: 3),
+                              SizedBox(width: 3),
                               Text('Goal reached',
                                   style: TextStyle(
                                       fontSize: 10.5,
@@ -926,7 +771,7 @@ class _DailyProgressCardState extends State<DailyProgressCard>
                   icon: LucideIcons.logIn,
                   color: _kDone,
                   label: 'Started',
-                  value: _clock(s.startedAt),
+                  value: _formatClock(s.startedAt),
                 ),
               ],
             ),
@@ -936,10 +781,10 @@ class _DailyProgressCardState extends State<DailyProgressCard>
     });
   }
  
-  Widget _timeline(WorkSession s, bool isDark) {
+  Widget _timeline(WorkSession s, DateTime now, bool isDark) {
     final textSub = isDark ? Colors.white54 : AppColors.textMuted;
-    final start = s.startedAt ?? _now;
-    final end = s.status == WorkStatus.ended ? (s.endedAt ?? _now) : _now;
+    final start = s.startedAt ?? now;
+    final end = s.status == WorkStatus.ended ? (s.endedAt ?? now) : now;
     final elapsedSec = s.startedAt == null ? 0 : end.difference(start).inSeconds;
     final scaleHours =
         math.max(widget.targetHours, (elapsedSec / 3600).ceil());
@@ -966,21 +811,23 @@ class _DailyProgressCardState extends State<DailyProgressCard>
         SizedBox(
           height: 26,
           width: double.infinity,
-          child: CustomPaint(
-            painter: _TimelinePainter(
-              segments: s.segments,
-              dayStart: start,
-              now: end,
-              scaleHours: scaleHours,
-              showMarker: live,
-              markerColor: s.status == WorkStatus.onBreak ? _kBreak : _kWork,
-              trackColor: isDark
-                  ? Colors.white.withValues(alpha: 0.09)
-                  : Colors.black.withValues(alpha: 0.06),
-              tickColor: isDark
-                  ? Colors.white.withValues(alpha: 0.10)
-                  : Colors.black.withValues(alpha: 0.08),
-              gapColor: Theme.of(context).cardColor,
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _TimelinePainter(
+                segments: s.segments,
+                dayStart: start,
+                now: end,
+                scaleHours: scaleHours,
+                showMarker: live,
+                markerColor: s.status == WorkStatus.onBreak ? _kBreak : _kWork,
+                trackColor: isDark
+                    ? Colors.white.withValues(alpha: 0.09)
+                    : Colors.black.withValues(alpha: 0.06),
+                tickColor: isDark
+                    ? Colors.white.withValues(alpha: 0.10)
+                    : Colors.black.withValues(alpha: 0.08),
+                gapColor: Theme.of(context).cardColor,
+              ),
             ),
           ),
         ),
@@ -1094,7 +941,7 @@ class _DailyProgressCardState extends State<DailyProgressCard>
                             color: isDark ? Colors.white : AppColors.textDark)),
                     const SizedBox(height: 2),
                     Text(
-                      '${_hm(worked)} worked · ended ${_clock(s.endedAt)}',
+                      '${_hm(worked)} worked · ended ${_formatClock(s.endedAt)}',
                       style: TextStyle(
                           fontSize: 12,
                           color:
@@ -1551,7 +1398,7 @@ class _RingPainter extends CustomPainter {
   bool shouldRepaint(covariant _RingPainter old) =>
       old.progress != progress ||
       old.trackColor != trackColor ||
-      old.colors != colors;
+      !listEquals(old.colors, colors);
 }
  
 /// Segmented day timeline: blue = work, hatched amber = break,
@@ -1658,5 +1505,14 @@ class _TimelinePainter extends CustomPainter {
   }
  
   @override
-  bool shouldRepaint(covariant _TimelinePainter old) => true;
+  bool shouldRepaint(covariant _TimelinePainter old) =>
+      !identical(old.segments, segments) ||
+      old.dayStart != dayStart ||
+      old.now != now ||
+      old.scaleHours != scaleHours ||
+      old.showMarker != showMarker ||
+      old.markerColor != markerColor ||
+      old.trackColor != trackColor ||
+      old.tickColor != tickColor ||
+      old.gapColor != gapColor;
 }

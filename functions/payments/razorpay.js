@@ -5,13 +5,16 @@ const crypto = require("crypto");
 const { generateUniqueFriendlyId } = require("../utils/friendlyId");
 
 // Fetching config from environment or Firebase config
-const razorpayKeyId = process.env.RAZORPAY_KEY_ID || (functions.config().razorpay && functions.config().razorpay.key_id) || "rzp_test_mock";
-const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || (functions.config().razorpay && functions.config().razorpay.key_secret) || "rzp_mock_secret";
+const razorpayKeyId = process.env.RAZORPAY_KEY_ID || (functions.config().razorpay && functions.config().razorpay.key_id) || "";
+const razorpayKeySecret = process.env.RAZORPAY_KEY_SECRET || (functions.config().razorpay && functions.config().razorpay.key_secret) || "";
+const isRazorpayConfigured = Boolean(razorpayKeyId && razorpayKeySecret);
 
-const razorpay = new Razorpay({
-  key_id: razorpayKeyId,
-  key_secret: razorpayKeySecret,
-});
+const razorpay = isRazorpayConfigured
+  ? new Razorpay({
+      key_id: razorpayKeyId,
+      key_secret: razorpayKeySecret,
+    })
+  : null;
 
 const cors = require("cors")({ origin: true });
 
@@ -19,6 +22,12 @@ exports.createRazorpayOrder = functions.https.onCall(async (data, context) => {
     try {
       if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+      }
+      if (!razorpay) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Payment gateway is not configured correctly. Please contact support."
+        );
       }
 
       const uid = context.auth.uid;
@@ -61,6 +70,12 @@ exports.verifyPayment = functions.https.onCall(async (data, context) => {
     try {
       if (!context.auth) {
         throw new functions.https.HttpsError("unauthenticated", "User must be logged in.");
+      }
+      if (!razorpay || !isRazorpayConfigured) {
+        throw new functions.https.HttpsError(
+          "failed-precondition",
+          "Payment gateway is not configured correctly. Please contact support."
+        );
       }
 
       const userId = context.auth.uid;

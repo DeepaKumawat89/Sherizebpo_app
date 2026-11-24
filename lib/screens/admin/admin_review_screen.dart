@@ -2084,21 +2084,20 @@ class _AudioPlayerWidgetState extends State<_AudioPlayerWidget> {
   Future<void> _initPlayer() async {
     if (mounted) setState(() { _isLoading = true; _hasError = false; });
     try {
-      // If this is our proxy recording endpoint, append the Firebase ID token
-      // as a query parameter (just_audio cannot set custom headers).
-      String audioUrl = widget.url;
-      if (audioUrl.contains('/api/recording')) {
+      // Authenticate the recording proxy without putting a bearer token in
+      // the URL, where it can leak through server logs, caches, and history.
+      Map<String, String>? headers;
+      if (widget.url.contains('/api/recording')) {
         try {
           final token = await FirebaseAuth.instance.currentUser?.getIdToken();
           if (token != null && token.isNotEmpty) {
-            final separator = audioUrl.contains('?') ? '&' : '?';
-            audioUrl = '$audioUrl${separator}token=$token';
+            headers = {'Authorization': 'Bearer $token'};
           }
         } catch (tokenErr) {
           debugPrint('Could not fetch auth token for recording: $tokenErr');
         }
       }
-      await _player.setUrl(audioUrl);
+      await _player.setUrl(widget.url, headers: headers);
 
       _player.positionStream.listen((p) {
         if (mounted) setState(() => _position = p);

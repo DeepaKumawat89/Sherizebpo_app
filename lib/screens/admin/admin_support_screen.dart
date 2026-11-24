@@ -23,7 +23,28 @@ void _showTicketImage(BuildContext context, String url) {
       child: Stack(
         children: [
           InteractiveViewer(
-            child: Center(child: Image.network(url)),
+            child: Center(
+              child: Image.network(
+                url,
+                loadingBuilder: (context, child, progress) => progress == null
+                    ? child
+                    : const SizedBox(
+                        height: 320,
+                        child: Center(
+                          child: CircularProgressIndicator(color: Colors.white),
+                        ),
+                      ),
+                errorBuilder: (context, error, stackTrace) => const SizedBox(
+                  height: 320,
+                  child: Center(
+                    child: Text(
+                      'Could not load attachment',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
           Positioned(
             top: 8,

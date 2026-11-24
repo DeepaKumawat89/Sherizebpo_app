@@ -1214,7 +1214,7 @@ class _EmployeeSessionCard extends StatelessWidget {
         ? location.address
         : addressParts.join(', ');
     if (displayAddress.isNotEmpty) {
-      return '$displayAddress\n$coordinates';
+      return '$displayAddress\n$coordinates\nAddress data © OpenStreetMap contributors';
     }
     if (location.addressUnavailable) {
       return 'Address unavailable\n$coordinates';

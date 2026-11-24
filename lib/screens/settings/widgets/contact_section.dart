@@ -20,6 +20,8 @@ class ContactSection extends StatefulWidget {
 }
  
 class _ContactSectionState extends State<ContactSection> {
+  static const int _maxScreenshotBytes = 8 * 1024 * 1024;
+  final ImagePicker _picker = ImagePicker();
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -39,6 +41,12 @@ class _ContactSectionState extends State<ContactSection> {
     'Report a Bug',
     'Other'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _recoverLostScreenshot();
+  }
  
   @override
   void dispose() {
@@ -51,17 +59,48 @@ class _ContactSectionState extends State<ContactSection> {
   }
  
   Future<void> _pickScreenshot() async {
-    final picker = ImagePicker();
     try {
-      final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+      final pickedFile = await _picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 80,
+      );
       if (pickedFile != null) {
-        setState(() => _screenshot = pickedFile);
+        await _acceptScreenshot(pickedFile);
       }
     } catch (e) {
       if (mounted) {
         SnackBarUtils.showError('Failed to pick image: $e');
       }
     }
+  }
+
+  Future<void> _recoverLostScreenshot() async {
+    try {
+      final response = await _picker.retrieveLostData();
+      if (response.isEmpty) return;
+      if (response.exception != null) throw response.exception!;
+      final files = response.files;
+      if (files != null && files.isNotEmpty) {
+        await _acceptScreenshot(files.first);
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtils.showError('Could not recover the selected screenshot: $e');
+      }
+    }
+  }
+
+  Future<void> _acceptScreenshot(XFile screenshot) async {
+    final length = await screenshot.length();
+    if (length <= 0 || length > _maxScreenshotBytes) {
+      if (mounted) {
+        SnackBarUtils.showError('Choose a screenshot smaller than 8 MB.');
+      }
+      return;
+    }
+    if (mounted) setState(() => _screenshot = screenshot);
   }
  
   void _submitSupportRequest() async {

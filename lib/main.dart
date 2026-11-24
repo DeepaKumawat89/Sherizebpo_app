@@ -2,9 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart'
+    show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
@@ -20,6 +22,7 @@ import 'screens/settings/passcode_screen.dart';
 import 'widgets/maintenance_overlay.dart';
 import 'widgets/app_update_gate.dart';
 import 'widgets/developer_credit.dart';
+import 'widgets/no_internet_gate.dart';
 
 /// Application entry point.
 ///
@@ -48,6 +51,23 @@ void main() {
             )
           : DefaultFirebaseOptions.currentPlatform,
     );
+
+    if (!useEmulators &&
+        !kIsWeb &&
+        defaultTargetPlatform == TargetPlatform.android) {
+      // Attach Play Integrity attestations to supported Firebase requests.
+      // Enforcement is enabled separately in the Firebase console after the
+      // Play-distributed release has been monitored for valid traffic.
+      try {
+        await FirebaseAppCheck.instance
+            .activate(providerAndroid: const AndroidPlayIntegrityProvider())
+            .timeout(const Duration(seconds: 5));
+      } catch (error) {
+        // App Check can be temporarily unavailable during an offline launch.
+        // Firebase retries token acquisition later; startup must still render.
+        debugPrint('Firebase App Check activation deferred: $error');
+      }
+    }
 
     if (useEmulators) {
       await FirebaseAuth.instance.useAuthEmulator('127.0.0.1', 9099);
@@ -79,6 +99,9 @@ void main() {
           ChangeNotifierProvider(create: (_) => SecurityService()),
           ChangeNotifierProvider(create: (_) => PlatformSettingsService()),
           ChangeNotifierProvider(create: (_) => CreditConfigService()),
+          ChangeNotifierProvider(
+            create: (_) => NetworkConnectivityService()..start(),
+          ),
           Provider(create: (_) => TaskService()),
         ],
         child: const SherizeApp(),
@@ -108,6 +131,9 @@ class SherizeApp extends StatefulWidget {
 }
 
 class _SherizeAppState extends State<SherizeApp> with WidgetsBindingObserver {
+  NetworkConnectivityService? _network;
+  bool _wasOnline = false;
+
   @override
   void initState() {
     super.initState();
@@ -115,6 +141,9 @@ class _SherizeAppState extends State<SherizeApp> with WidgetsBindingObserver {
     // Restore session/security first; remote configuration can wait one more
     // frame so it does not compete with initial rendering.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _network = context.read<NetworkConnectivityService>();
+      _wasOnline = _network!.isOnline;
+      _network!.addListener(_handleConnectivityChange);
       unawaited(context.read<AuthService>().init());
       unawaited(context.read<SecurityService>().init());
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -127,15 +156,32 @@ class _SherizeAppState extends State<SherizeApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _network?.removeListener(_handleConnectivityChange);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
+  void _handleConnectivityChange() {
+    final network = _network;
+    if (!mounted || network == null) return;
+    final isOnline = network.isOnline;
+    if (isOnline && !_wasOnline) {
+      final auth = context.read<AuthService>();
+      if (auth.sessionRestoreFailed) unawaited(auth.init());
+    }
+    _wasOnline = isOnline;
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_network?.checkNow());
+    }
     // Lock app when it goes into background or is minimized.
     // Excluding AppLifecycleState.inactive prevents locking on system notifications/drawers.
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden || state == AppLifecycleState.detached) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
       context.read<SecurityService>().lockApp();
     }
   }
@@ -188,19 +234,25 @@ class _SherizeAppState extends State<SherizeApp> with WidgetsBindingObserver {
                 routingState.role != 'super_admin' &&
                 !routingState.developer;
 
-            return AppUpdateGate(child: Stack(
-              children: [
-                if (child != null) (shouldBlock ? const MaintenanceOverlay() : child),
-                if (isLocked)
-                  HeroControllerScope.none(
-                    child: Navigator(
-                      onGenerateRoute: (_) => MaterialPageRoute<void>(
-                        builder: (_) => PasscodeScreen(mode: PasscodeMode.lock, navigatorKey: navigatorKey),
+            return NoInternetGate(
+              child: AppUpdateGate(child: Stack(
+                children: [
+                  if (child != null)
+                    (shouldBlock ? const MaintenanceOverlay() : child),
+                  if (isLocked)
+                    HeroControllerScope.none(
+                      child: Navigator(
+                        onGenerateRoute: (_) => MaterialPageRoute<void>(
+                          builder: (_) => PasscodeScreen(
+                            mode: PasscodeMode.lock,
+                            navigatorKey: navigatorKey,
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-              ],
-            ));
+                ],
+              )),
+            );
           },
         );
   }

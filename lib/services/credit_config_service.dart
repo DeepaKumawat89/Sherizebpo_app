@@ -50,6 +50,7 @@ class CreditConfigService extends ChangeNotifier {
   }
 
   void init() {
+    if (_sub != null) return;
     _sub = _ref.snapshots().listen((doc) {
       final data = doc.data();
       if (data != null) {

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lucide_icons/lucide_icons.dart';
@@ -38,24 +40,28 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
   bool _loading = false;
   String? _error;
-  bool _checkedForJobPopup = false;
+  Timer? _jobPopupTimer;
+  bool _jobPopupShown = false;
  
   @override
   void initState() {
     super.initState();
     _useEmployeeId = widget.useEmployeeId;
+    _scheduleJobPopup();
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_checkedForJobPopup) return;
-    _checkedForJobPopup = true;
-    final arguments = ModalRoute.of(context)?.settings.arguments;
-    final showJobs = arguments is Map && arguments['showJobPopup'] == true;
-    if (showJobs) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _showJobPopup());
-    }
+  void _scheduleJobPopup([Duration delay = const Duration(seconds: 5)]) {
+    _jobPopupTimer?.cancel();
+    _jobPopupTimer = Timer(delay, () {
+      if (!mounted || _jobPopupShown ||
+          ModalRoute.of(context)?.isCurrent != true) return;
+      if (_loading) {
+        _scheduleJobPopup(const Duration(seconds: 1));
+        return;
+      }
+      _jobPopupShown = true;
+      unawaited(_showJobPopup());
+    });
   }
 
   Future<void> _showJobPopup() async {
@@ -71,6 +77,7 @@ class _LoginScreenState extends State<LoginScreen> {
  
   @override
   void dispose() {
+    _jobPopupTimer?.cancel();
     _emailCtrl.dispose();
     _employeeIdCtrl.dispose();
     _passwordCtrl.dispose();

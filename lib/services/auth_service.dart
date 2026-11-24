@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:firebase_auth/firebase_auth.dart';
@@ -9,9 +11,10 @@ import '../core/constants/constants.dart';
 import '../core/utils/string_utils.dart';
 import 'notification_service.dart';
 
-/// Manages authentication state, token persistence, and user session.
+/// Manages authentication state and the user session.
 ///
-/// Integrated with Firebase Authentication (Phone Auth, Google Auth) and local SharedPreferences.
+/// Firebase Auth owns durable credential storage. ID tokens are kept only in
+/// memory because SharedPreferences is not appropriate for bearer tokens.
 class AuthService extends ChangeNotifier {
   AuthService({FirebaseAuth? auth, FirebaseFirestore? firestore})
       : _authOverride = auth,
@@ -37,6 +40,7 @@ class AuthService extends ChangeNotifier {
   Set<String> _roles = {};
   String? _activeAdminRole;
   bool _sessionRestoreFailed = false;
+  bool _initializing = false;
   static const adminRoles = [
     'admin',
     'super_admin',
@@ -100,14 +104,29 @@ class AuthService extends ChangeNotifier {
 
   // ─── Initialise from local storage & Firebase ──────────────────
   Future<void> init() async {
+    if (_initializing) return;
+    _initializing = true;
     _isInitialized = false;
     _sessionRestoreFailed = false;
     _role = null;
     _roles = {};
     _activeAdminRole = null;
     notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    _token = prefs.getString(AppConstants.tokenKey);
+    late final SharedPreferences prefs;
+    try {
+      prefs = await SharedPreferences.getInstance();
+    } catch (_) {
+      _initializing = false;
+      _isInitialized = true;
+      _sessionRestoreFailed = _auth.currentUser != null;
+      notifyListeners();
+      return;
+    }
+    // Remove tokens persisted by older releases. Firebase Auth restores and
+    // refreshes its own session; duplicating a bearer token in plaintext
+    // SharedPreferences exposes it to backups and compromised devices.
+    await prefs.remove(AppConstants.tokenKey);
+    _token = null;
     _onboardingComplete = prefs.getBool(AppConstants.onboardingKey) ?? false;
 
     // Check Firebase Auth state directly
@@ -115,9 +134,6 @@ class AuthService extends ChangeNotifier {
       final user = _auth.currentUser;
       if (user != null) {
         _token = await user.getIdToken().timeout(const Duration(seconds: 10));
-        if (_token != null) {
-          await prefs.setString(AppConstants.tokenKey, _token!);
-        }
         // User is authenticated → they have already completed onboarding.
         // Persist this flag so the app never sends them back to onboarding.
         if (!_onboardingComplete) {
@@ -142,6 +158,7 @@ class AuthService extends ChangeNotifier {
       _token = null;
       _sessionRestoreFailed = _auth.currentUser != null;
     } finally {
+      _initializing = false;
       _isInitialized = true;
       notifyListeners();
     }
@@ -153,14 +170,14 @@ class AuthService extends ChangeNotifier {
   Future<String?> loginWithEmailPassword(String email, String password) async {
     _isLoading = true;
     notifyListeners();
-    User? signedInUser;
     try {
-      final cred = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final cred = await _auth
+          .signInWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          )
+          .timeout(const Duration(seconds: 15));
       final user = cred.user;
-      signedInUser = user;
       if (user == null) {
         _isLoading = false;
         notifyListeners();
@@ -169,15 +186,16 @@ class AuthService extends ChangeNotifier {
       final snap = await FirebaseFirestore.instance
           .collection('users')
           .doc(user.uid)
-          .get();
+          .get()
+          .timeout(const Duration(seconds: 12));
       final data = snap.data();
       _workerId = data?['workerId'];
       _role = data?['role']?.toString().toLowerCase() ?? 'worker';
 
-      final token = await user.getIdToken(true);
+      final token =
+          await user.getIdToken(true).timeout(const Duration(seconds: 12));
       if (token != null) {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
         await prefs.setBool(AppConstants.onboardingKey, true);
         _token = token;
         _onboardingComplete = true;
@@ -187,7 +205,6 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return null; // success
     } on FirebaseAuthException catch (e) {
-      if (signedInUser != null) await _auth.signOut();
       _isLoading = false;
       notifyListeners();
       switch (e.code) {
@@ -200,11 +217,16 @@ class AuthService extends ChangeNotifier {
           return 'Enter a valid email address.';
         case 'user-disabled':
           return 'This account has been disabled. Contact support.';
+        case 'network-request-failed':
+          return 'No internet connection. Your session has been preserved.';
         default:
           return 'Login failed: ${e.message ?? e.code}';
       }
+    } on TimeoutException {
+      _isLoading = false;
+      notifyListeners();
+      return 'The connection is taking too long. Your session has been preserved.';
     } catch (_) {
-      if (signedInUser != null) await _auth.signOut();
       _isLoading = false;
       notifyListeners();
       return 'Login failed. Please try again.';
@@ -216,7 +238,8 @@ class AuthService extends ChangeNotifier {
     try {
       final result = await FirebaseFunctions.instance
           .httpsCallable('resolveEmployeeLogin')
-          .call({'employeeId': employeeId.trim()});
+          .call({'employeeId': employeeId.trim()})
+          .timeout(const Duration(seconds: 15));
       final loginEmail = result.data?['loginEmail']?.toString() ?? '';
       if (!loginEmail.endsWith('@${AppConstants.employeeLoginDomain}')) {
         return 'Employee ID or password is incorrect.';
@@ -232,7 +255,12 @@ class AuthService extends ChangeNotifier {
       if (error.code == 'invalid-argument') {
         return 'Enter a valid Employee ID (for example, SHR-4450).';
       }
+      if (error.code == 'unavailable' || error.code == 'deadline-exceeded') {
+        return 'Unable to reach Sherize. Check your internet and try again.';
+      }
       return 'Employee ID or password is incorrect.';
+    } on TimeoutException {
+      return 'The connection is taking too long. Please try again.';
     } catch (_) {
       return 'Login failed. Please try again.';
     }
@@ -452,8 +480,6 @@ class AuthService extends ChangeNotifier {
       final token = await user?.getIdToken();
 
       if (token != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
         _token = token;
       }
 
@@ -538,8 +564,6 @@ class AuthService extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(AppConstants.tokenKey, token);
     _token = token;
 
     _isLoading = false;
@@ -559,10 +583,12 @@ class AuthService extends ChangeNotifier {
 
     try {
       // 1. Firebase Auth — Email/Password sign-in
-      final userCredential = await _auth.signInWithEmailAndPassword(
-        email: email.trim(),
-        password: password,
-      );
+      final userCredential = await _auth
+          .signInWithEmailAndPassword(
+            email: email.trim(),
+            password: password,
+          )
+          .timeout(const Duration(seconds: 15));
 
       final user = userCredential.user;
       if (user == null) {
@@ -572,7 +598,11 @@ class AuthService extends ChangeNotifier {
       }
 
       // 2. Fetch Firestore user doc and validate role
-      final userDoc = await _firestore.collection('users').doc(user.uid).get();
+      final userDoc = await _firestore
+          .collection('users')
+          .doc(user.uid)
+          .get()
+          .timeout(const Duration(seconds: 12));
 
       if (!userDoc.exists) {
         await _auth.signOut();
@@ -606,10 +636,9 @@ class AuthService extends ChangeNotifier {
       // roles (synced from Firestore by syncUserClaims) are in the token that
       // security rules check. Without force:true a stale token can deny
       // queries for a role that was added after the admin last signed in.
-      final token = await user.getIdToken(true);
+      final token =
+          await user.getIdToken(true).timeout(const Duration(seconds: 12));
       if (token != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
         _token = token;
       }
 
@@ -634,10 +663,21 @@ class AuthService extends ChangeNotifier {
         case 'too-many-requests':
           return 'Too many attempts. Please try later.';
         case 'network-request-failed':
-          return 'No internet connection. Please try again.';
+          return 'No internet connection. Your session has been preserved.';
         default:
           return e.message ?? 'Authentication failed.';
       }
+    } on TimeoutException {
+      _isLoading = false;
+      notifyListeners();
+      return 'The connection is taking too long. Your session has been preserved.';
+    } on FirebaseException catch (e) {
+      _isLoading = false;
+      notifyListeners();
+      if (e.code == 'unavailable' || e.code == 'deadline-exceeded') {
+        return 'Unable to reach Sherize. Your session has been preserved.';
+      }
+      return 'Could not load the admin workspace. Please try again.';
     } catch (e) {
       _isLoading = false;
       notifyListeners();
@@ -698,8 +738,6 @@ class AuthService extends ChangeNotifier {
 
       final token = await user.getIdToken();
       if (token != null) {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(AppConstants.tokenKey, token);
         _token = token;
       }
 
@@ -736,19 +774,26 @@ class AuthService extends ChangeNotifier {
         if (user == null) {
           debugPrint(
               'sendEmailVerification error: no authenticated Firebase user');
+          _isLoading = false;
+          notifyListeners();
           return 'Session expired. Please log in again.';
         }
       }
 
       await FirebaseFunctions.instance
           .httpsCallable('sendEmailOtp')
-          .call({'email': email});
+          .call({'email': email})
+          .timeout(const Duration(seconds: 15));
 
-      await user.reload();
+      await user.reload().timeout(const Duration(seconds: 10));
 
       _isLoading = false;
       notifyListeners();
       return null;
+    } on TimeoutException {
+      _isLoading = false;
+      notifyListeners();
+      return 'The connection is taking too long. Please try again.';
     } on FirebaseFunctionsException catch (e) {
       debugPrint(
         'sendEmailVerification FirebaseFunctionsException: '

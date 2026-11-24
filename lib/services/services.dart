@@ -8,3 +8,4 @@ export 'error_logging_service.dart';
 export 'verification_service.dart';
 export 'platform_settings_service.dart';
 export 'credit_config_service.dart';
+export 'network_connectivity_service.dart';

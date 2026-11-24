@@ -23,6 +23,7 @@ class EditProfileScreen extends StatefulWidget {
 }
  
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  static const int _maxProfileImageBytes = 5 * 1024 * 1024;
   final _formKey = GlobalKey<FormState>();
  
   // Basic Info
@@ -73,6 +74,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _loadUserData();
+    _recoverLostImage();
   }
  
   @override
@@ -185,18 +187,47 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           maxWidth: 512,
           maxHeight: 512,
           imageQuality: 85);
-      if (image != null && mounted) {
-        final bytes = await image.readAsBytes();
-        setState(() {
-          _newProfileImage = image;
-          _newProfileBytes = bytes;
-        });
-      }
+      if (image != null) await _acceptProfileImage(image);
     } catch (e) {
       if (mounted) {
         SnackBarUtils.showError('Failed to pick image: $e');
       }
     }
+  }
+
+  Future<void> _recoverLostImage() async {
+    try {
+      final response = await _picker.retrieveLostData();
+      if (response.isEmpty) return;
+      if (response.exception != null) {
+        throw response.exception!;
+      }
+      final files = response.files;
+      if (files != null && files.isNotEmpty) {
+        await _acceptProfileImage(files.first);
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarUtils.showError('Could not recover the selected image: $e');
+      }
+    }
+  }
+
+  Future<void> _acceptProfileImage(XFile image) async {
+    final length = await image.length();
+    if (length <= 0 || length > _maxProfileImageBytes) {
+      if (mounted) {
+        SnackBarUtils.showError('Choose an image smaller than 5 MB.');
+      }
+      return;
+    }
+    // Keep a single bounded byte buffer for both the preview and upload.
+    final bytes = await image.readAsBytes();
+    if (!mounted) return;
+    setState(() {
+      _newProfileImage = image;
+      _newProfileBytes = bytes;
+    });
   }
  
   Future<void> _selectDate(BuildContext context) async {
@@ -234,13 +265,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
  
     try {
       String? newImageUrl = _existingProfileImageUrl;
-      if (_newProfileImage != null) {
+      if (_newProfileImage != null && _newProfileBytes != null) {
         final storageRef = FirebaseStorage.instance
             .ref()
             .child('profile/${user.uid}/profile.jpg');
-        final bytes = await _newProfileImage!.readAsBytes();
         final metadata = SettableMetadata(contentType: 'image/jpeg');
-        final uploadTask = await storageRef.putData(bytes, metadata);
+        final uploadTask = await storageRef.putData(_newProfileBytes!, metadata);
         newImageUrl = await uploadTask.ref.getDownloadURL();
       }
  
@@ -588,6 +618,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                                                     ? Image.memory(
                                                         _newProfileBytes!,
                                                         fit: BoxFit.cover,
+                                                        cacheWidth: 256,
+                                                        cacheHeight: 256,
                                                       )
                                                     : (_existingProfileImageUrl !=
                                                                 null &&

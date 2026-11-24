@@ -26,11 +26,15 @@ class AttendanceLocationException implements Exception {
 /// It never reads a cached/previous attendance location.
 class AttendanceLocationService {
   AttendanceLocationService({http.Client? client})
-      : _client = client ?? http.Client();
+      : _client = client ?? http.Client(),
+        _ownsClient = client == null;
 
   final http.Client _client;
+  final bool _ownsClient;
 
-  void close() => _client.close();
+  void close() {
+    if (_ownsClient) _client.close();
+  }
 
   /// Checks only the GPS service and foreground permission. This is safe to
   /// call when the employee dashboard is restored because it does not obtain
@@ -129,18 +133,22 @@ class AttendanceLocationService {
           : const {
               'Accept': 'application/json',
               'Accept-Language': 'en',
-              'User-Agent': 'Sherize-Attendance/2.1',
+              'User-Agent':
+                  'Sherize-Attendance/2.1 (https://sherize.in; info@sherize.in)',
             };
       final response = await _client
           .get(uri, headers: headers)
           .timeout(const Duration(seconds: 12));
       if (response.statusCode != 200) return const _AddressResult.unavailable();
 
-      final body = jsonDecode(response.body);
-      if (body is! Map) return const _AddressResult.unavailable();
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map) return const _AddressResult.unavailable();
+      final body = Map<String, dynamic>.from(decoded);
+      final displayName = (body['display_name'] ?? '').toString().trim();
       final raw = body['address'];
-      if (raw is! Map) return const _AddressResult.unavailable();
-      final address = Map<String, dynamic>.from(raw);
+      final address = raw is Map
+          ? Map<String, dynamic>.from(raw)
+          : const <String, dynamic>{};
       String value(String key) => (address[key] ?? '').toString().trim();
       String first(List<String> keys) {
         for (final key in keys) {
@@ -150,13 +158,29 @@ class AttendanceLocationService {
         return '';
       }
 
-      final road = first(['road', 'pedestrian', 'footway', 'path']);
+      final road = first([
+        'road',
+        'pedestrian',
+        'living_street',
+        'residential',
+        'footway',
+        'path',
+      ]);
       final houseNumber = value('house_number');
       final street = [houseNumber, road]
           .where((part) => part.isNotEmpty)
           .join(' ');
-      final locality =
-          first(['locality', 'suburb', 'neighbourhood', 'quarter', 'hamlet']);
+      final locality = first([
+        'locality',
+        'suburb',
+        'neighbourhood',
+        'quarter',
+        'borough',
+        'subdivision',
+        'city_district',
+        'district',
+        'hamlet',
+      ]);
       final city =
           first(['city', 'town', 'village', 'municipality', 'city_district']);
       final state = first(['state', 'state_district', 'region']);
@@ -166,9 +190,11 @@ class AttendanceLocationService {
       for (final part in [street, locality, city, state, postalCode, country]) {
         if (part.isNotEmpty && !parts.contains(part)) parts.add(part);
       }
-      if (parts.isEmpty) return const _AddressResult.unavailable();
+      final formattedAddress =
+          displayName.isNotEmpty ? displayName : parts.join(', ');
+      if (formattedAddress.isEmpty) return const _AddressResult.unavailable();
       return _AddressResult(
-        address: parts.join(', '),
+        address: formattedAddress,
         street: street,
         locality: locality,
         city: city,

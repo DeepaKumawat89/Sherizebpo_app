@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -21,15 +22,20 @@ class VerificationService {
   /// Returns [VerificationStatus.newUser()] when no document exists.
   Future<VerificationStatus> getStatus(String uid) async {
     try {
-      final snap = await _firestore.collection('users').doc(uid).get();
+      final snap = await _firestore
+          .collection('users')
+          .doc(uid)
+          .get()
+          .timeout(const Duration(seconds: 10));
       if (!snap.exists || snap.data() == null) {
         return VerificationStatus.newUser();
       }
       return VerificationStatus.fromMap(snap.data()!);
     } catch (e) {
       debugPrint('VerificationService.getStatus error: $e');
-      // Fail-open: treat as new user so they go through the gate
-      return VerificationStatus.newUser();
+      // Do not mistake a network/Firebase failure for a first-time user. The
+      // verification gate already has a retry state and keeps the session.
+      rethrow;
     }
   }
 
@@ -42,7 +48,7 @@ class VerificationService {
       await _firestore.collection('users').doc(uid).set({
         'phoneVerified': true,
         'phoneVerifiedAt': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
+      }, SetOptions(merge: true)).timeout(const Duration(seconds: 10));
     } catch (e) {
       debugPrint('markPhoneVerified error: $e');
     }
@@ -57,21 +63,26 @@ class VerificationService {
     if (user == null) return 'Not authenticated.';
 
     try {
-      final idToken = await user.getIdToken();
+      final idToken =
+          await user.getIdToken().timeout(const Duration(seconds: 10));
       if (idToken == null || idToken.isEmpty) {
         return 'Session expired. Please log in again.';
       }
-      final response = await http.post(
-        Uri.parse('https://us-central1-sherize-bpo.cloudfunctions.net/verifyEmailOtp'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $idToken',
-          ...{'Authorization': 'Bearer $idToken'},
-        },
-        body: jsonEncode({
-          'data': {'otp': otp, 'email': email}
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse(
+              'https://us-central1-sherize-bpo.cloudfunctions.net/verifyEmailOtp',
+            ),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $idToken',
+              ...{'Authorization': 'Bearer $idToken'},
+            },
+            body: jsonEncode({
+              'data': {'otp': otp, 'email': email}
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
       if (response.statusCode != 200) {
         try {
@@ -92,6 +103,15 @@ class VerificationService {
       return null; // success
 
       
+    } on TimeoutException {
+      return 'The connection is taking too long. Please try again.';
+    } on FirebaseAuthException catch (e) {
+      if (e.code == 'network-request-failed') {
+        return 'No internet connection. Please try again.';
+      }
+      return 'Could not verify your session. Please try again.';
+    } on http.ClientException {
+      return 'Unable to reach Sherize. Check your internet and try again.';
     } on FirebaseFunctionsException catch (e) {
       if (e.code == 'invalid-argument') {
         return 'Incorrect OTP. Please try again.';

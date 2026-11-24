@@ -156,6 +156,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
                           'Records of tasks accepted, calls made, and submissions completed for quality assurance and earning calculations.',
                     ),
                     const _BulletItem(
+                      title: 'Precise Location Data',
+                      body:
+                          'With your permission, we collect your precise device location only when you perform an attendance action such as check-in, break start, resume, or checkout. Sherize does not continuously track your location.',
+                    ),
+                    const _BulletItem(
                       title: 'Device & Usage Data',
                       body:
                           'Authentication activity, notification tokens, task activity, and technical error details needed to operate, secure, and improve the app.',
@@ -178,6 +183,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       title: 'Task Assignment',
                       body:
                           'To match you with appropriate BPO tasks based on your profile and skill eligibility.',
+                    ),
+                    const _BulletItem(
+                      title: 'Attendance Verification',
+                      body:
+                          'To save the location and address attached to an employee-initiated attendance event and allow authorized Sherize administrators to review that attendance history. We do not use location for advertising.',
                     ),
                     const _BulletItem(
                       title: 'Earnings & Payouts',
@@ -222,6 +232,11 @@ class PrivacyPolicyScreen extends StatelessWidget {
                       title: 'Client Businesses',
                       body:
                           'Your task results may be shared with the business client who owns the task, but your personal identity is kept confidential.',
+                    ),
+                    const _BulletItem(
+                      title: 'Address Provider',
+                      body:
+                          'Precise coordinates are sent to OpenStreetMap Nominatim only when resolving an attendance location into a formatted address. The provider processes this data under its privacy terms.',
                     ),
                   ],
                 ),

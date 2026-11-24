@@ -188,6 +188,11 @@ class SupportService extends ChangeNotifier {
       String? screenshotUrl;
 
       if (screenshot != null) {
+        const maxScreenshotBytes = 8 * 1024 * 1024;
+        final length = await screenshot.length();
+        if (length <= 0 || length > maxScreenshotBytes) {
+          return 'Screenshot must be smaller than 8 MB';
+        }
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final ref = _storage
             .ref()

@@ -50,8 +50,8 @@ class NotificationService extends ChangeNotifier {
 
     // 4. Create Android channel for foreground notifications (needed for reference below)
     const AndroidNotificationChannel channel = AndroidNotificationChannel(
-      'high_importance_channel', // id
-      'High Importance Notifications', // title
+      'sherize_notifications', // Must match the manifest FCM default channel.
+      'Sherize Notifications',
       description:
           'This channel is used for important notifications.', // description
       importance: Importance.high,
@@ -131,7 +131,7 @@ class NotificationService extends ChangeNotifier {
         debugPrint('FCM token update skipped on web (no VAPID key configured)');
         return;
       } else {
-        token = await _fcm.getToken();
+        token = await _fcm.getToken().timeout(const Duration(seconds: 8));
       }
       if (token != null) {
         await _saveTokenToFirestore(token);
@@ -149,7 +149,7 @@ class NotificationService extends ChangeNotifier {
       await _firestore.collection('users').doc(user.uid).update({
         'fcmToken': token,
         'lastTokenUpdated': FieldValue.serverTimestamp(),
-      });
+      }).timeout(const Duration(seconds: 8));
       debugPrint('FCM token updated in Firestore');
     } catch (e) {
       debugPrint('Error saving FCM token to Firestore: $e');
