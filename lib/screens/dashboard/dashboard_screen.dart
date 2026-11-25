@@ -9,8 +9,8 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../../core/constants/constants.dart';
 import '../../core/theme/app_decorations.dart';
 import '../../routes.dart';
+import '../../services/network_connectivity_service.dart';
 import '../../services/platform_settings_service.dart';
-import '../../services/mail_service.dart';
 import '../jobs/applicant_home_screen.dart';
 import '../../widgets/earnings_card.dart';
 import '../../widgets/task_summary_card.dart';
@@ -97,23 +97,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                         return const ApplicantHomeScreen();
                       }
  
-                      final userName =
-                          data['fullName'] ?? data['name'] ?? 'Employee';
-                      final firstName = userName.toString().split(' ').first;
- 
                       final settings = context.watch<PlatformSettingsService>();
  
                       return CustomScrollView(
                         physics: const BouncingScrollPhysics(),
                         slivers: [
                           // ── Custom App Bar ───────────────────────────────
-                          _buildAppBar(
-                            context,
-                            firstName,
-                            userName.toString(),
-                            data,
-                            isDark,
-                          ),
+                          _buildAppBar(context, isDark),
  
                           // ── Dashboard Content ────────────────────────────
                           SliverPadding(
@@ -260,382 +250,161 @@ class _DashboardScreenState extends State<DashboardScreen>
   // ═══════════════════════════════════════════════════════════
   // APP BAR
   // ═══════════════════════════════════════════════════════════
-  Widget _buildAppBar(
-    BuildContext context,
-    String firstName,
-    String userName,
-    Map<String, dynamic> data,
-    bool isDark,
-  ) {
-    final hour = DateTime.now().hour;
-    String greeting;
-    IconData greetIcon;
-    if (hour < 12) {
-      greeting = 'Good Morning';
-      greetIcon = LucideIcons.sunrise;
-    } else if (hour < 17) {
-      greeting = 'Good Afternoon';
-      greetIcon = LucideIcons.sun;
-    } else {
-      greeting = 'Good Evening';
-      greetIcon = LucideIcons.sunset;
-    }
- 
-    final initial = firstName.isNotEmpty ? firstName[0].toUpperCase() : 'U';
- 
+  Widget _buildAppBar(BuildContext context, bool isDark) {
+    final network = context.watch<NetworkConnectivityService>();
+    final isOnline = network.isOnline;
+    const weekdays = [
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+      'Sunday',
+    ];
+    const months = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    final now = DateTime.now();
+    final currentDate =
+        '${weekdays[now.weekday - 1]}, ${now.day} ${months[now.month - 1]}';
+
     return SliverAppBar(
-      expandedHeight: 200,
-      collapsedHeight: 72,
-      floating: false,
       pinned: true,
+      toolbarHeight: 72,
+      automaticallyImplyLeading: false,
+      backgroundColor: isDark ? AppColors.secondary : AppColors.primaryDark,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(
           bottom: Radius.circular(AppSizes.radiusXxl),
         ),
       ),
       clipBehavior: Clip.antiAlias,
-      backgroundColor:
-          isDark ? AppColors.secondary : AppColors.primaryDark,
-      surfaceTintColor: Colors.transparent,
-      automaticallyImplyLeading: false,
-      flexibleSpace: LayoutBuilder(
-        builder: (context, constraints) {
-          final settings = context
-              .dependOnInheritedWidgetOfExactType<FlexibleSpaceBarSettings>();
-          final collapseRange = settings == null
-              ? 0.0
-              : settings.maxExtent - settings.minExtent;
-          final collapseProgress = collapseRange <= 0
-              ? 0.0
-              : (1 -
-                      (settings!.currentExtent - settings.minExtent) /
-                          collapseRange)
-                  .clamp(0.0, 1.0);
-          final pinnedOpacity = Curves.easeOut.transform(
-            ((collapseProgress - 0.62) / 0.38).clamp(0.0, 1.0),
-          );
- 
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              FlexibleSpaceBar(
-                collapseMode: CollapseMode.pin,
-                background: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    bottom: Radius.circular(AppSizes.radiusXxl),
-                  ),
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: isDark
-                          ? AppDecorations.darkGradient
-                          : AppDecorations.primaryGradient,
-                    ),
-                    child: Stack(
-                      children: [
-                        Positioned(
-                          right: -56,
-                          top: -36,
-                          child: Container(
-                            width: 180,
-                            height: 180,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.primaryLight
-                                  .withValues(alpha: 0.18),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          left: -52,
-                          bottom: -80,
-                          child: Container(
-                            width: 164,
-                            height: 164,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: AppColors.violet.withValues(alpha: 0.16),
-                            ),
-                          ),
-                        ),
-                        Positioned(
-                          right: 70,
-                          bottom: 28,
-                          child: Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.white.withValues(alpha: 0.06),
-                            ),
-                          ),
-                        ),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            MediaQuery.sizeOf(context).width < 360
-                                ? AppSizes.base
-                                : AppSizes.screenPaddingH,
-                            MediaQuery.paddingOf(context).top + AppSizes.md,
-                            MediaQuery.sizeOf(context).width < 360
-                                ? AppSizes.base
-                                : AppSizes.screenPaddingH,
-                            AppSizes.xl,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisAlignment: MainAxisAlignment.end,
-                            children: [
-                              Row(
-                                children: [
-                                  GestureDetector(
-                                    onTap: () => _selectTab(2),
-                                    child: _buildAvatar(initial, data),
-                                  ),
-                                  const Spacer(),
-                                  _buildMailIconButton(context),
-                                  const SizedBox(width: AppSizes.sm),
-                                  _buildIconButton(
-                                    context: context,
-                                    icon: LucideIcons.bell,
-                                    onTap: () => Navigator.pushNamed(
-                                      context,
-                                      AppRoutes.notifications,
-                                    ),
-                                  ),
-                                  const SizedBox(width: AppSizes.sm),
-                                  _buildIconButton(
-                                    context: context,
-                                    icon: LucideIcons.settings,
-                                    onTap: () => Navigator.pushNamed(
-                                      context,
-                                      AppRoutes.settings,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const Spacer(),
-                              Row(
-                                children: [
-                                  Icon(greetIcon,
-                                      size: 17, color: AppColors.accentLight),
-                                  const SizedBox(width: AppSizes.sm),
-                                  Text(
-                                    greeting,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .bodyMedium
-                                        ?.copyWith(
-                                          color: Colors.white70,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: AppSizes.xs),
-                              Text(
-                                firstName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineLarge
-                                    ?.copyWith(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 30,
-                                      letterSpacing: -0.6,
-                                    ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-              IgnorePointer(
-                ignoring: pinnedOpacity == 0,
-                child: Opacity(
-                  opacity: pinnedOpacity,
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: MediaQuery.sizeOf(context).width < 360
-                            ? AppSizes.base
-                            : AppSizes.screenPaddingH,
-                      ),
-                      child: SizedBox(
-                        height: 72,
-                        child: Align(
-                          alignment: Alignment.centerLeft,
-                          child: GestureDetector(
-                            behavior: HitTestBehavior.opaque,
-                            onTap: () => _selectTab(2),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildAvatar(initial, data),
-                                const SizedBox(width: AppSizes.md),
-                                Flexible(
-                                  child: Text(
-                                    userName,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context)
-                                        .textTheme
-                                        .titleMedium
-                                        ?.copyWith(
-                                          color: Colors.white,
-                                          fontWeight: FontWeight.w800,
-                                        ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
+      flexibleSpace: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: isDark
+              ? AppDecorations.darkGradient
+              : AppDecorations.primaryGradient,
+        ),
       ),
-    );
-  }
- 
-  Widget _buildAvatar(String initial, Map<String, dynamic> data) {
-    final profileUrl = data['profileImage'] ??
-        data['profileImageUrl'] ??
-        data['avatar_url'] ??
-        '';
- 
-    return Container(
-      width: AppSizes.avatarMd,
-      height: AppSizes.avatarMd,
-      decoration: BoxDecoration(
-        gradient: AppDecorations.primaryLightGradient,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white, width: 2.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.18),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+      titleSpacing: MediaQuery.sizeOf(context).width < 360
+          ? AppSizes.base
+          : AppSizes.screenPaddingH,
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              'Dashboard',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Colors.white,
+                    fontSize: 23,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+            ),
+          ),
+          const SizedBox(width: AppSizes.sm),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSizes.md,
+              vertical: AppSizes.sm,
+            ),
+            decoration: BoxDecoration(
+              color: (isOnline ? AppColors.success : AppColors.error)
+                  .withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(AppSizes.radiusRound),
+              border: Border.all(
+                color: (isOnline ? AppColors.success : AppColors.error)
+                    .withValues(alpha: 0.34),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: BoxDecoration(
+                    color: isOnline ? AppColors.success : AppColors.error,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: AppSizes.xs),
+                Text(
+                  isOnline ? 'Active' : 'Disconnected',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
-      child: profileUrl.toString().isNotEmpty
-          ? ClipOval(
-              child: Image.network(
-                profileUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => Center(
-                  child: Text(
-                    initial,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
-              ),
-            )
-          : Center(
-              child: Text(
-                initial,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
-              ),
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(64),
+        child: Container(
+          width: double.infinity,
+          margin: EdgeInsets.fromLTRB(
+            MediaQuery.sizeOf(context).width < 360
+                ? AppSizes.base
+                : AppSizes.screenPaddingH,
+            0,
+            MediaQuery.sizeOf(context).width < 360
+                ? AppSizes.base
+                : AppSizes.screenPaddingH,
+            AppSizes.md,
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSizes.base,
+            vertical: AppSizes.sm,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(AppSizes.radiusRound),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.18),
             ),
-    );
-  }
- 
-  Widget _buildIconButton({
-    required BuildContext context,
-    required IconData icon,
-    required VoidCallback onTap,
-    bool hasBadge = false,
-  }) {
-    return SizedBox(
-      width: 42,
-      height: 42,
-      child: Material(
-        color: Colors.white.withValues(alpha: 0.14),
-        clipBehavior: Clip.antiAlias,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppSizes.radiusMd),
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.22)),
-        ),
-        child: InkWell(
-          onTap: onTap,
-          splashColor: Colors.white.withValues(alpha: 0.18),
-          highlightColor: Colors.white.withValues(alpha: 0.08),
-          child: Stack(
-            alignment: Alignment.center,
+          ),
+          child: Row(
             children: [
-              Icon(icon, size: 20, color: Colors.white),
-              if (hasBadge)
-                Positioned(
-                  top: 8,
-                  right: 8,
-                  child: Container(
-                    width: 9,
-                    height: 9,
-                    decoration: BoxDecoration(
-                      color: AppColors.error,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
+              const Icon(
+                LucideIcons.calendarDays,
+                size: 17,
+                color: Colors.white70,
+              ),
+              const SizedBox(width: AppSizes.sm),
+              Text(
+                currentDate,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ),
-                ),
+              ),
             ],
           ),
         ),
       ),
     );
   }
- 
-  /// Mail icon (worker inbox) with a live unread badge.
-  Widget _buildMailIconButton(BuildContext context) {
-    final uid = FirebaseAuth.instance.currentUser?.uid;
-    if (uid == null) {
-      return _buildIconButton(
-        context: context,
-        icon: LucideIcons.mail,
-        onTap: () => Navigator.pushNamed(context, AppRoutes.inbox),
-      );
-    }
-    return StreamBuilder<QuerySnapshot>(
-      stream: MailService().myThreads(uid),
-      builder: (context, snap) {
-        var hasUnread = false;
-        if (snap.hasData) {
-          for (final doc in snap.data!.docs) {
-            final data = doc.data() as Map<String, dynamic>;
-            if (MailService.isUnreadFor(uid, data)) {
-              hasUnread = true;
-              break;
-            }
-          }
-        }
-        return _buildIconButton(
-          context: context,
-          icon: LucideIcons.mail,
-          hasBadge: hasUnread,
-          onTap: () => Navigator.pushNamed(context, AppRoutes.inbox),
-        );
-      },
-    );
-  }
- 
+
   // ═══════════════════════════════════════════════════════════
   // EARNINGS SECTION
   // ═══════════════════════════════════════════════════════════
